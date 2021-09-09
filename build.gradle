@@ -1,0 +1,50 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.17'
+    }
+}
+
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.5.30'
+    id 'java'
+    id 'idea'
+    id 'com.google.protobuf' version '0.8.17'
+}
+
+group 'info.skyblond.ariteg'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+compileKotlin {
+    kotlinOptions.jvmTarget = 11
+}
+
+dependencies {
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.5.30'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
+    implementation 'com.google.protobuf:protobuf-java:3.17.3'
+    implementation 'com.google.protobuf:protobuf-java-util:3.17.3'
+    implementation 'ch.qos.logback:logback-classic:1.2.5'
+    implementation 'com.github.multiformats:java-multihash:v1.3.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:3.17.3'
+    }
+}

@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package ariteg;
+
+option java_multiple_files = true;
+option java_package = "info.skyblond.ariteg";
+
+message AritegLink {
+  // name of the link
+  string name = 1;
+  // multihash of target
+  bytes multihash = 2;
+  // byte count of target
+  uint64 size = 3;
+}
+
+enum AritegObjectType {
+  BLOB = 0;
+  LIST = 1;
+  TREE = 2;
+  COMMIT = 3;
+  ENCRYPTED = 4;
+  SIGNED = 5;
+}
+
+// Commit data for commit object
+message AritegCommitData {
+  // type of committed object
+  AritegObjectType type = 1;
+  // unix timestamp of this
+  uint64 unix_timestamp = 2;
+  // commit message
+  string message = 3;
+}
+
+message AritegObject {
+  // Type of this object
+  AritegObjectType typeOfObject = 1;
+  // blob or encrypted or signed data content
+  // content is a object if encrypted or signed
+  bytes data = 2;
+  // list or tree types for links
+  repeated AritegObjectType typesOfLinks = 3;
+  // commit data
+  AritegCommitData commit_data = 4;
+  // list or tree or commit links
+  repeated AritegLink links = 5;
+  // encrypted tag
+  bytes encrypted_tag = 6;
+  // signed signature
+  repeated bytes signatures = 7;
+  // signed pub keys
+  repeated bytes pubKeys = 8;
+}
