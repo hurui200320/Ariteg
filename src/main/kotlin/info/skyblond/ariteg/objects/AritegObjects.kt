@@ -24,37 +24,35 @@ data class AritegBlobObject(
 }
 
 data class AritegListObject(
-    val list: List<Pair<AritegObjectType, AritegLink>>
+    val list: List<AritegLink>
 ) : AbstractAritegObject() {
     companion object : AbstractAritegObjectCompanion<AritegListObject>(AritegObjectType.LIST) {
         override fun toInstance(proto: AritegObject): AritegListObject {
-            return AritegListObject(proto.typesOfLinksList.zip(proto.linksList))
+            return AritegListObject(proto.linksList)
         }
     }
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
             .setTypeOfObject(AritegObjectType.LIST)
-            .addAllTypesOfLinks(list.map { it.first })
-            .addAllLinks(list.map { it.second })
+            .addAllLinks(list)
             .build()
     }
 }
 
 data class AritegTreeObject(
-    val list: List<Pair<AritegObjectType, AritegLink>>
+    val links: List<AritegLink>
 ) : AbstractAritegObject() {
     companion object : AbstractAritegObjectCompanion<AritegTreeObject>(AritegObjectType.TREE) {
         override fun toInstance(proto: AritegObject): AritegTreeObject {
-            return AritegTreeObject(proto.typesOfLinksList.zip(proto.linksList))
+            return AritegTreeObject(proto.linksList)
         }
     }
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
             .setTypeOfObject(AritegObjectType.TREE)
-            .addAllTypesOfLinks(list.map { it.first })
-            .addAllLinks(list.map { it.second })
+            .addAllLinks(links)
             .build()
     }
 }
@@ -94,54 +92,6 @@ data class AritegCommitObject(
             .addLinks(parentLink)
             .addLinks(commitObjectLink)
             .addLinks(authorLink)
-            .build()
-    }
-}
-
-
-data class AritegEncryptedObject(
-    val encryptedObjectBytes: ByteString,
-    val tag: ByteString
-) : AbstractAritegObject() {
-    companion object : AbstractAritegObjectCompanion<AritegEncryptedObject>(AritegObjectType.ENCRYPTED) {
-        override fun toInstance(proto: AritegObject): AritegEncryptedObject {
-            return AritegEncryptedObject(
-                proto.data,
-                proto.encryptedTag
-            )
-        }
-    }
-
-    override fun toProto(): AritegObject {
-        return AritegObject.newBuilder()
-            .setTypeOfObject(AritegObjectType.ENCRYPTED)
-            .setData(encryptedObjectBytes)
-            .setEncryptedTag(tag)
-            .build()
-    }
-}
-
-data class AritegSignedObject(
-    val signedObject: AritegObject,
-    val signatures: List<ByteString>,
-    val publicKeys: List<ByteString>
-) : AbstractAritegObject() {
-    companion object : AbstractAritegObjectCompanion<AritegSignedObject>(AritegObjectType.SIGNED) {
-        override fun toInstance(proto: AritegObject): AritegSignedObject {
-            return AritegSignedObject(
-                AritegObject.parseFrom(proto.data),
-                proto.signaturesList,
-                proto.pubKeysList
-            )
-        }
-    }
-
-    override fun toProto(): AritegObject {
-        return AritegObject.newBuilder()
-            .setTypeOfObject(AritegObjectType.SIGNED)
-            .setData(signedObject.toByteString())
-            .addAllSignatures(signatures)
-            .addAllPubKeys(publicKeys)
             .build()
     }
 }

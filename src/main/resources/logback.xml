@@ -31,7 +31,7 @@
     <!-- block jetty mess debug message-->
     <logger name="org.eclipse.jetty" level="INFO"/>
 
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="FILE-ROLLING"/>
         <appender-ref ref="CONSOLE"/>
     </root>

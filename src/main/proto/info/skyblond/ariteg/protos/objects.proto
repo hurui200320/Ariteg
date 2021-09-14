@@ -19,8 +19,6 @@ enum AritegObjectType {
   LIST = 1;
   TREE = 2;
   COMMIT = 3;
-  ENCRYPTED = 4;
-  SIGNED = 5;
 }
 
 // Commit data for commit object
@@ -36,19 +34,10 @@ message AritegCommitData {
 message AritegObject {
   // Type of this object
   AritegObjectType typeOfObject = 1;
-  // blob or encrypted or signed data content
-  // content is a object if encrypted or signed
+  // blob data content
   bytes data = 2;
-  // list or tree types for links
-  repeated AritegObjectType typesOfLinks = 3;
   // commit data
-  AritegCommitData commit_data = 4;
+  AritegCommitData commit_data = 3;
   // list or tree or commit links
-  repeated AritegLink links = 5;
-  // encrypted tag
-  bytes encrypted_tag = 6;
-  // signed signature
-  repeated bytes signatures = 7;
-  // signed pub keys
-  repeated bytes pubKeys = 8;
+  repeated AritegLink links = 4;
 }
