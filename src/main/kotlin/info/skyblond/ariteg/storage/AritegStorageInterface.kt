@@ -2,6 +2,7 @@ package info.skyblond.ariteg.storage
 
 import info.skyblond.ariteg.AritegLink
 import info.skyblond.ariteg.AritegObject
+import java.io.File
 import java.io.InputStream
 
 interface AritegStorageInterface : AutoCloseable {
@@ -29,7 +30,7 @@ interface AritegStorageInterface : AutoCloseable {
      *
      * Return true if the target exists.
      * */
-    fun protoExists(link: AritegLink): Boolean
+    fun linkExists(link: AritegLink): Boolean
 
     /**
      * Check the given proto if is ready to load, if not, restore it (S3 archive).
@@ -38,7 +39,7 @@ interface AritegStorageInterface : AutoCloseable {
      * Throw [ObjectNotFoundException] if object not found
      * */
     @Throws(ObjectNotFoundException::class)
-    fun protoAvailable(link: AritegLink): Boolean
+    fun linkAvailable(link: AritegLink): Boolean
 
     /**
      * Load a proto from a given link.
@@ -62,16 +63,28 @@ interface AritegStorageInterface : AutoCloseable {
      * */
     fun writeInputStreamToProto(
         inputStream: InputStream,
-        blobSize: Int = 256 * 1024, // 256K
-        listLength: Int = 176, // 176 blob in one list
+        blobSize: Int = 256 * 1024, // * 1024, // 4MB
+        listLength: Int = 176 // 4096, // 4096 blob in one list
     ): AritegObject
 
     /**
      * Return a inputStream representing a stream written by [writeInputStreamToProto].
-     *
      * Only BlobObject and ListObject is allowed.
+     * Note: It's storage provider's job to provide someway to restore or check if
+     * the whole merkel tree is available
      * */
     fun readInputStreamFromProto(
         proto: AritegObject
     ): InputStream
+
+    /**
+     * Store a dir and return a TreeObject.
+     * */
+    fun storeDir(dir: File): AritegObject
+
+    /**
+     * Walk the tree, call [foo] on each blob or list entry.
+     * String is the path of the entry, start with "/"
+     */
+    fun walkTree(treeProto: AritegObject, foo: (String, InputStream) -> Unit)
 }

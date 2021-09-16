@@ -17,7 +17,7 @@ data class AritegBlobObject(
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
-            .setTypeOfObject(AritegObjectType.BLOB)
+            .setType(AritegObjectType.BLOB)
             .setData(data)
             .build()
     }
@@ -34,7 +34,7 @@ data class AritegListObject(
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
-            .setTypeOfObject(AritegObjectType.LIST)
+            .setType(AritegObjectType.LIST)
             .addAllLinks(list)
             .build()
     }
@@ -51,7 +51,7 @@ data class AritegTreeObject(
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
-            .setTypeOfObject(AritegObjectType.TREE)
+            .setType(AritegObjectType.TREE)
             .addAllLinks(links)
             .build()
     }
@@ -81,7 +81,7 @@ data class AritegCommitObject(
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
-            .setTypeOfObject(AritegObjectType.COMMIT)
+            .setType(AritegObjectType.COMMIT)
             .setCommitData(
                 AritegCommitData.newBuilder()
                     .setType(type)

@@ -36,14 +36,14 @@ abstract class AbstractAritegObjectCompanion<T>(
      * If the object is type
      * */
     fun isTypeOf(proto: AritegObject): Boolean {
-        return proto.typeOfObject == AritegObjectType.BLOB
+        return proto.type == AritegObjectType.BLOB
     }
 
     /**
      * Generate instance from proto.
      * */
     fun fromProto(proto: AritegObject): T {
-        require(isTypeOf(proto)) { "Expect ${expectedType.name} object but ${proto.typeOfObject.name} object is given" }
+        require(isTypeOf(proto)) { "Expect ${expectedType.name} object but ${proto.type.name} object is given" }
         return toInstance(proto)
     }
 

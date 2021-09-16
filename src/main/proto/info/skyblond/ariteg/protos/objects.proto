@@ -33,11 +33,12 @@ message AritegCommitData {
 
 message AritegObject {
   // Type of this object
-  AritegObjectType typeOfObject = 1;
+  AritegObjectType type = 1;
   // blob data content
   bytes data = 2;
+  // list, tree and commit links
+  // Note: commit link has fixed name: parent, link, author
+  repeated AritegLink links = 3;
   // commit data
-  AritegCommitData commit_data = 3;
-  // list or tree or commit links
-  repeated AritegLink links = 4;
+  AritegCommitData commit_data = 4;
 }
