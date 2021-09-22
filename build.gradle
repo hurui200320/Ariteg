@@ -32,13 +32,13 @@ compileKotlin {
 
 dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.5.30'
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.0'
 
-    implementation 'com.google.protobuf:protobuf-java:3.17.3'
-    implementation 'com.google.protobuf:protobuf-java-util:3.17.3'
+    implementation 'com.google.protobuf:protobuf-java:3.18.0'
+    implementation 'com.google.protobuf:protobuf-java-util:3.18.0'
 
-    implementation 'ch.qos.logback:logback-classic:1.2.5'
+    implementation 'ch.qos.logback:logback-classic:1.2.6'
     implementation 'com.github.multiformats:java-multihash:v1.3.0'
     implementation 'org.mapdb:mapdb:3.0.8'
 }
