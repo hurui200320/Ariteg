@@ -47,7 +47,9 @@ class FileNativeStorageLayer(
             private fun fetchNextBlob() {
                 while (linkList.isNotEmpty() && currentBlob == null) {
                     // fetch the first link
-                    val obj = storageClient.loadProto(linkList.removeAt(0))
+                    val link = linkList.removeAt(0)
+                    while (!storageClient.linkAvailable(link)) Thread.yield()
+                    val obj = storageClient.loadProto(link)
                     if (obj.type == ObjectType.BLOB) {
                         // is blob, use it
                         currentBlob = obj
@@ -113,6 +115,7 @@ class FileNativeStorageLayer(
             if (!storageClient.linkExists(link)) throw ObjectNotFoundException(link)
             while (!storageClient.linkAvailable(link))
                 TimeUnit.SECONDS.sleep(1)
+            while (!storageClient.linkAvailable(link)) Thread.yield()
             val obj = storageClient.loadProto(link)
             when (obj.type) {
                 ObjectType.BLOB, ObjectType.LIST -> foo(storageClient, this, parent + link.name, obj)

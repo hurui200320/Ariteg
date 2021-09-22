@@ -28,6 +28,13 @@ class AsyncNativeStorageClient(
         }
     }
 
+    /**
+     * return if all writing job are done
+     * */
+    fun allClear(): Boolean {
+        return writingQueue.isEmpty()
+    }
+
     override fun close() {
         super.close()
         threadPool.shutdown()
