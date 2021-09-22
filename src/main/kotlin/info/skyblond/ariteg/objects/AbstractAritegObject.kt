@@ -1,8 +1,11 @@
 package info.skyblond.ariteg.objects
 
 import info.skyblond.ariteg.AritegObject
-import info.skyblond.ariteg.AritegObjectType
+import info.skyblond.ariteg.ObjectType
 
+/**
+ * A standard that all AritegObject should follow.
+ * */
 abstract class AbstractAritegObject {
     /**
      * Convert current instance to proto
@@ -28,15 +31,18 @@ abstract class AbstractAritegObject {
     }
 }
 
+/**
+ * A companion object standard that all AritegObject should have.
+ * */
 abstract class AbstractAritegObjectCompanion<T>(
-    protected val expectedType: AritegObjectType
+    protected val expectedType: ObjectType
 ) where T : AbstractAritegObject {
 
     /**
      * If the object is type
      * */
     fun isTypeOf(proto: AritegObject): Boolean {
-        return proto.type == AritegObjectType.BLOB
+        return proto.type == ObjectType.BLOB
     }
 
     /**

@@ -10,11 +10,9 @@ message AritegLink {
   string name = 1;
   // multihash of target
   bytes multihash = 2;
-  // byte count of target
-  uint64 size = 3;
 }
 
-enum AritegObjectType {
+enum ObjectType {
   BLOB = 0;
   LIST = 1;
   TREE = 2;
@@ -22,9 +20,9 @@ enum AritegObjectType {
 }
 
 // Commit data for commit object
-message AritegCommitData {
+message CommitData {
   // type of committed object
-  AritegObjectType type = 1;
+  ObjectType type = 1;
   // unix timestamp of this
   uint64 unix_timestamp = 2;
   // commit message
@@ -33,12 +31,12 @@ message AritegCommitData {
 
 message AritegObject {
   // Type of this object
-  AritegObjectType type = 1;
+  ObjectType type = 1;
   // blob data content
   bytes data = 2;
   // list, tree and commit links
   // Note: commit link has fixed name: parent, link, author
   repeated AritegLink links = 3;
   // commit data
-  AritegCommitData commit_data = 4;
+  CommitData commit_data = 4;
 }

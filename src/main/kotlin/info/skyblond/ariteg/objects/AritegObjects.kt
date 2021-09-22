@@ -1,74 +1,90 @@
 package info.skyblond.ariteg.objects
 
 import com.google.protobuf.ByteString
-import info.skyblond.ariteg.AritegCommitData
 import info.skyblond.ariteg.AritegLink
 import info.skyblond.ariteg.AritegObject
-import info.skyblond.ariteg.AritegObjectType
+import info.skyblond.ariteg.CommitData
+import info.skyblond.ariteg.ObjectType
+import javax.annotation.concurrent.Immutable
 
-data class AritegBlobObject(
+/**
+ * Blob Object, store data only.
+ * */
+@Immutable
+data class BlobObject(
     val data: ByteString
 ) : AbstractAritegObject() {
-    companion object : AbstractAritegObjectCompanion<AritegBlobObject>(AritegObjectType.BLOB) {
-        override fun toInstance(proto: AritegObject): AritegBlobObject {
-            return AritegBlobObject(proto.data)
+    companion object : AbstractAritegObjectCompanion<BlobObject>(ObjectType.BLOB) {
+        override fun toInstance(proto: AritegObject): BlobObject {
+            return BlobObject(proto.data)
         }
     }
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
-            .setType(AritegObjectType.BLOB)
+            .setType(ObjectType.BLOB)
             .setData(data)
             .build()
     }
 }
 
-data class AritegListObject(
+/**
+ * List Object, concat list of blob/list to get data.
+ * */
+@Immutable
+data class ListObject(
     val list: List<AritegLink>
 ) : AbstractAritegObject() {
-    companion object : AbstractAritegObjectCompanion<AritegListObject>(AritegObjectType.LIST) {
-        override fun toInstance(proto: AritegObject): AritegListObject {
-            return AritegListObject(proto.linksList)
+    companion object : AbstractAritegObjectCompanion<ListObject>(ObjectType.LIST) {
+        override fun toInstance(proto: AritegObject): ListObject {
+            return ListObject(proto.linksList)
         }
     }
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
-            .setType(AritegObjectType.LIST)
+            .setType(ObjectType.LIST)
             .addAllLinks(list)
             .build()
     }
 }
 
-data class AritegTreeObject(
+/**
+ * Tree Object, represent a folder-like structure with links.
+ * */
+@Immutable
+data class TreeObject(
     val links: List<AritegLink>
 ) : AbstractAritegObject() {
-    companion object : AbstractAritegObjectCompanion<AritegTreeObject>(AritegObjectType.TREE) {
-        override fun toInstance(proto: AritegObject): AritegTreeObject {
-            return AritegTreeObject(proto.linksList)
+    companion object : AbstractAritegObjectCompanion<TreeObject>(ObjectType.TREE) {
+        override fun toInstance(proto: AritegObject): TreeObject {
+            return TreeObject(proto.linksList)
         }
     }
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
-            .setType(AritegObjectType.TREE)
+            .setType(ObjectType.TREE)
             .addAllLinks(links)
             .build()
     }
 }
 
-
-data class AritegCommitObject(
-    val type: AritegObjectType,
+/**
+ * Commit Object, representing a snapshot of an object at some time.
+ * */
+@Immutable
+data class CommitObject(
+    val type: ObjectType,
     val unixTimestamp: Long,
     val message: String,
     val parentLink: AritegLink,
     val commitObjectLink: AritegLink,
     val authorLink: AritegLink,
 ) : AbstractAritegObject() {
-    companion object : AbstractAritegObjectCompanion<AritegCommitObject>(AritegObjectType.COMMIT) {
-        override fun toInstance(proto: AritegObject): AritegCommitObject {
-            return AritegCommitObject(
+    companion object : AbstractAritegObjectCompanion<CommitObject>(ObjectType.COMMIT) {
+        override fun toInstance(proto: AritegObject): CommitObject {
+            return CommitObject(
                 type = proto.commitData.type,
                 unixTimestamp = proto.commitData.unixTimestamp,
                 message = proto.commitData.message,
@@ -81,9 +97,9 @@ data class AritegCommitObject(
 
     override fun toProto(): AritegObject {
         return AritegObject.newBuilder()
-            .setType(AritegObjectType.COMMIT)
+            .setType(ObjectType.COMMIT)
             .setCommitData(
-                AritegCommitData.newBuilder()
+                CommitData.newBuilder()
                     .setType(type)
                     .setUnixTimestamp(unixTimestamp)
                     .setMessage(message)

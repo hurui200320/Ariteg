@@ -22,19 +22,21 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 
-sourceCompatibility = 17
-targetCompatibility = 17
+sourceCompatibility = 11
+targetCompatibility = 11
 
 compileKotlin {
-    kotlinOptions.jvmTarget = 17
+    kotlinOptions.jvmTarget = 11
 }
 
 dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.5.30'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
+
     implementation 'com.google.protobuf:protobuf-java:3.17.3'
     implementation 'com.google.protobuf:protobuf-java-util:3.17.3'
+
     implementation 'ch.qos.logback:logback-classic:1.2.5'
     implementation 'com.github.multiformats:java-multihash:v1.3.0'
     implementation 'org.mapdb:mapdb:3.0.8'
