@@ -12,6 +12,7 @@ plugins {
     id 'java'
     id 'idea'
     id 'com.google.protobuf' version '0.8.17'
+    id 'com.adarshr.test-logger' version '3.0.0'
 }
 
 group 'info.skyblond.ariteg'
@@ -50,4 +51,9 @@ protobuf {
     protoc {
         artifact = 'com.google.protobuf:protoc:3.17.3'
     }
+}
+
+testlogger {
+    showFullStackTraces true
+    slowThreshold 5000
 }
