@@ -2,6 +2,7 @@ package info.skyblond.ariteg.storage
 
 import info.skyblond.ariteg.AritegObject
 import info.skyblond.ariteg.multihash.MultihashJavaProvider
+import info.skyblond.ariteg.multihash.MultihashProviders
 import info.skyblond.ariteg.storage.client.disk.AsyncNativeStorageClient
 import info.skyblond.ariteg.storage.client.disk.BlockingNativeStorageClient
 import info.skyblond.ariteg.storage.layer.FileNativeStorageLayer
@@ -20,7 +21,7 @@ class NativeStorageTest {
     // Each test has it own instance, it's safe to use field
     private val sourceDir = File("./test_source_dir_${System.currentTimeMillis()}_${Random.nextInt()}")
     private val dataDir = File("./test_data_dir_${System.currentTimeMillis()}_${Random.nextInt()}")
-    private val sha3Provider512 = MultihashJavaProvider.createSha3provider512()
+    private val sha3Provider512 = MultihashProviders.sha3Provider512()
 
     /**
      * A test dir contains:

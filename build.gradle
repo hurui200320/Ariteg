@@ -41,6 +41,7 @@ dependencies {
     implementation 'ch.qos.logback:logback-classic:1.2.6'
     implementation 'com.github.multiformats:java-multihash:v1.3.0'
     implementation 'org.mapdb:mapdb:3.0.8'
+    implementation 'org.bouncycastle:bcprov-jdk15on:1.69'
 }
 
 test {

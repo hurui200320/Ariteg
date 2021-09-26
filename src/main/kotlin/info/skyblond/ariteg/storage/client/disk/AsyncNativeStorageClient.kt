@@ -1,10 +1,9 @@
 package info.skyblond.ariteg.storage.client.disk
 
-import com.google.protobuf.ByteString
-import io.ipfs.multihash.Multihash
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * This storage client only block a small amount of time to
@@ -16,15 +15,15 @@ class AsyncNativeStorageClient(
     threadNum: Int = Runtime.getRuntime().availableProcessors()
 ) : AbstractNativeStorageClient(baseDir) {
     private val threadPool = Executors.newFixedThreadPool(threadNum)
+    private val counter = AtomicLong(0)
 
-    override fun handleWrite(multihash: Multihash, type: String, file: File, rawBytes: ByteArray) {
+    override fun handleWrite(file: File, rawBytes: ByteArray, preWrite: () -> Unit, postWrite: () -> Unit) {
+        counter.incrementAndGet()
         threadPool.execute {
+            preWrite.invoke()
             file.writeBytes(rawBytes)
-            // add to type db
-            val multihashByteString = ByteString.copyFrom(multihash.toBytes())
-            objectTypeMap[multihashByteString] = type
-            // remove from writing queue
-            require(writingQueue.remove(multihashByteString, rawBytes.size)) { "Data corrupt!" }
+            postWrite.invoke()
+            counter.decrementAndGet()
         }
     }
 
@@ -32,7 +31,7 @@ class AsyncNativeStorageClient(
      * return if all writing job are done
      * */
     fun allClear(): Boolean {
-        return writingQueue.isEmpty()
+        return counter.get() == 0L
     }
 
     override fun close() {
