@@ -1,6 +1,7 @@
 package info.skyblond.ariteg.storage.layer
 
 import com.google.protobuf.ByteString
+import info.skyblond.ariteg.AritegLink
 import info.skyblond.ariteg.AritegObject
 import info.skyblond.ariteg.ObjectType
 import info.skyblond.ariteg.storage.client.StorageClient
@@ -21,7 +22,9 @@ abstract class AbstractStorageLayer(
         blobSize: Int,
         listLength: Int,
     ): AritegObject {
-        val blobList = mutableListOf<AritegObject>()
+        val linkList = mutableListOf<AritegLink>()
+        // save the last stored proto, returned as root node
+        var lastProto: AritegObject
         inputStream.use { inputSteam ->
             var actualCount: Int
             // This will at least store 1 blob.
@@ -34,23 +37,27 @@ abstract class AbstractStorageLayer(
                     .setType(ObjectType.BLOB)
                     .setData(ByteString.copyFrom(bytes, 0, actualCount))
                     .build()
-                blobList.add(blobObject)
+                // store on the fly
+                lastProto = blobObject
+                linkList.add(storageClient.storeProto(blobObject))
             } while (actualCount > 0)
         }
 
         var i = 0
-        while (blobList.size > 1) {
+        while (linkList.size > 1) {
             // merging blob list to list
-            val linkList = List(minOf(listLength, blobList.size - i)) { storageClient.storeProto(blobList.removeAt(i)) }
+            val list = List(minOf(listLength, linkList.size - i)) { linkList.removeAt(i) }
             val listObject = AritegObject.newBuilder()
                 .setType(ObjectType.LIST)
-                .addAllLinks(linkList)
+                .addAllLinks(list)
                 .build()
-            blobList.add(i++, listObject)
+            lastProto = listObject
+            linkList.add(i++, storageClient.storeProto(listObject))
             // reset i if we reach the end
-            if (i >= blobList.size) i = 0
+            if (i >= linkList.size) i = 0
         }
+        assert(storageClient.storeProto(lastProto).multihash == linkList[0].multihash)
         // The result is combine all link into one single root
-        return blobList[0].also { storageClient.storeProto(it) }
+        return lastProto
     }
 }

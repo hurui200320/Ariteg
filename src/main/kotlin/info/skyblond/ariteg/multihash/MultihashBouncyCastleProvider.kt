@@ -1,9 +1,7 @@
 package info.skyblond.ariteg.multihash
 
 import io.ipfs.multihash.Multihash
-import org.bouncycastle.crypto.ExtendedDigest
-import org.bouncycastle.crypto.digests.Blake2bDigest
-import org.bouncycastle.crypto.digests.Blake3Digest
+import org.bouncycastle.crypto.Digest
 import java.io.InputStream
 
 /**
@@ -12,7 +10,7 @@ import java.io.InputStream
  * */
 class MultihashBouncyCastleProvider(
     private val hashType: Multihash.Type,
-    private val provider: () -> ExtendedDigest
+    private val provider: () -> Digest
 ) : MultihashProvider {
     override fun getType(): Multihash.Type {
         return hashType

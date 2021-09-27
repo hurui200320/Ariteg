@@ -102,7 +102,7 @@ interface StorageClient : AutoCloseable {
      * is designed for sanity check, in case you forget prepare it first.
      * */
     @Throws(ObjectNotFoundException::class, ObjectNotReadyException::class)
-    fun linkAvailable(link: AritegLink, restore: Boolean = false): Boolean
+    fun linkAvailable(link: AritegLink): Boolean
 
     /**
      * Load a proto from a given link.

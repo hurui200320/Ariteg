@@ -35,9 +35,11 @@ class AsyncNativeStorageClient(
     }
 
     override fun close() {
-        super.close()
         threadPool.shutdown()
         threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.HOURS)
+        // this has to be called last, it close db
+        // if some task haven't finished, close db too early will cause issue.
+        super.close()
     }
 
 }

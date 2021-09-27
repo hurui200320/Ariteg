@@ -184,7 +184,7 @@ abstract class AbstractNativeStorageClient(
             throw ObjectNotFoundException(link)
     }
 
-    override fun linkAvailable(link: AritegLink, restore: Boolean): Boolean {
+    override fun linkAvailable(link: AritegLink): Boolean {
         // read objects on disk
         if (objectTypeMap.contains(link.multihash))
             return true
@@ -218,6 +218,10 @@ abstract class AbstractNativeStorageClient(
         throw ObjectNotFoundException(multihash)
     }
 
+    /**
+     * This will affect all pending writing actions, since they need update
+     * database after finish writing. So call this last if you do async writing.
+     * */
     override fun close() {
         db.close()
     }
