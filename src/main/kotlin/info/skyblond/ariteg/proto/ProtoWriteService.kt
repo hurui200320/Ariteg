@@ -1,0 +1,156 @@
+package info.skyblond.ariteg.proto
+
+import com.google.protobuf.ByteString
+import info.skyblond.ariteg.AritegLink
+import info.skyblond.ariteg.AritegObject
+import info.skyblond.ariteg.ObjectType
+import info.skyblond.ariteg.objects.CommitObject
+import info.skyblond.ariteg.objects.TreeObject
+import info.skyblond.ariteg.proto.meta.ProtoMetaService
+import info.skyblond.ariteg.proto.storage.MultihashNotMatchException
+import info.skyblond.ariteg.proto.storage.ProtoStorageService
+import java.io.InputStream
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import kotlin.random.Random
+
+/**
+ * The proto write service make use of storage service and meta service to handle
+ * IO writes.
+ * */
+abstract class ProtoWriteService(
+    protected val metaService: ProtoMetaService,
+    protected val storageService: ProtoStorageService,
+    protected val timeoutMillisecond: Long,
+) {
+    /**
+     * Write a proto into system and properly set the metadata
+     * */
+    fun writeProto(name: String, proto: AritegObject): Pair<AritegLink, Future<Unit>> =
+        storageService.storeProto(name, proto, { primaryHash, secondaryHash ->
+            val token = Random.nextLong()
+            // save the entry
+            var entry = metaService.saveIfPrimaryMultihashNotExists(
+                primaryHash, secondaryHash, proto.type, token
+            )
+            // check hash collision
+            if (secondaryHash != entry.secondaryMultihash) {
+                // report collision
+                throw MultihashNotMatchException(secondaryHash, entry.secondaryMultihash)
+            }
+            // check the token
+            if (entry.temp == null) {
+                // the data is persistent stored
+                return@storeProto false // cancel the writing request
+            }
+            // keep checking
+            while (true) {
+                if (entry.temp == token) {
+                    // we got the token, confirm the writing request
+                    return@storeProto true
+                } else {
+                    // someone is writing, then we wait
+                    val deadline = System.currentTimeMillis() + timeoutMillisecond
+                    while (System.currentTimeMillis() < deadline)
+                        TimeUnit.MILLISECONDS.sleep(deadline - System.currentTimeMillis())
+                    // and check the result
+                    entry = metaService.getByPrimaryMultihash(primaryHash)
+                        ?: throw AssertionError("Entry is deleted during writing: ${primaryHash.toBase58()}")
+                    // if we get null, then onError is called to handle error
+                }
+
+                if (entry.temp == null) {
+                    // write is done, break loop to cancel this writing
+                    break
+                } else {
+                    // timeout, try to lock the key
+                    metaService.compareAndSetTempFlag(primaryHash, entry.temp!!, token)
+                    // then check in next loop
+                }
+            }
+            false
+        }) { primaryHash ->
+            // writing is done, remove temp.
+            // get the old value first
+            var oldValue = metaService.compareAndSetTempFlag(primaryHash, 0L, null)
+            while (oldValue != null) {
+                oldValue = metaService.compareAndSetTempFlag(primaryHash, oldValue, null)
+            }
+            // once compareAndSetTempFlag return null
+            // the replacement is done
+        }
+
+    /**
+     * Write a chunk of data into system, return a link
+     * to a blob or list object representing that data.
+     * */
+    fun writeChunk(
+        name: String, inputStream: InputStream,
+        blobSize: Int, listLength: Int
+    ): Pair<AritegLink, List<Future<Unit>>> {
+        val futureList = mutableListOf<Future<Unit>>()
+        val linkList = mutableListOf<AritegLink>()
+        var actualCount: Int
+        // This will at least store 1 blob.
+        // if the input stream is empty, then an empty blob is stored.
+        do {
+            val bytes = ByteArray(blobSize)
+            actualCount = inputStream.read(bytes)
+            if (actualCount == -1 && linkList.size == 0) {
+                // write empty block only when link list is empty
+                actualCount = 0
+            }
+            // skip the ending where count = -1
+            if (actualCount >= 0) {
+                val blobObject = AritegObject.newBuilder()
+                    .setType(ObjectType.BLOB)
+                    .setData(ByteString.copyFrom(bytes, 0, actualCount))
+                    .build()
+                writeProto("", blobObject).let {
+                    linkList.add(it.first)
+                    futureList.add(it.second)
+                }
+            }
+        } while (actualCount > 0)
+
+        var i = 0
+        while (linkList.size > 1) {
+            // merging blob list to list
+            val list = List(minOf(listLength, linkList.size - i)) { linkList.removeAt(i) }
+            val listObject = AritegObject.newBuilder()
+                .setType(ObjectType.LIST)
+                .addAllLinks(list)
+                .build()
+            writeProto("", listObject).let {
+                linkList.add(i++, it.first)
+                futureList.add(it.second)
+            }
+            // reset i if remains link are not enough for a new list
+            if (i + listLength > linkList.size) i = 0
+        }
+
+        // The result is combine all link into one single root
+        return linkList[0].toBuilder().setName(name).build() to futureList
+    }
+
+    /**
+     * Pack a list of link into a tree object.
+     * */
+    fun packLinks(name: String, links: List<AritegLink>): Pair<AritegLink, Future<Unit>> =
+        writeProto(
+            name, TreeObject(links).toProto()
+        )
+
+    /**
+     * Make a commit object with a given link
+     * */
+    fun commitLink(
+        name: String, unixTimestamp: Long,
+        message: String, parentLink: AritegLink,
+        committedObjectLink: AritegLink, authorLink: AritegLink
+    ): Pair<AritegLink, Future<Unit>> = writeProto(
+        name, CommitObject(
+            unixTimestamp, message, parentLink, committedObjectLink, authorLink
+        ).toProto()
+    )
+}
