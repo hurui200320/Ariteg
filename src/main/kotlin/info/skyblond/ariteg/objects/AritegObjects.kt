@@ -75,22 +75,20 @@ data class TreeObject(
  * */
 @Immutable
 data class CommitObject(
-    val type: ObjectType,
     val unixTimestamp: Long,
     val message: String,
     val parentLink: AritegLink,
-    val commitObjectLink: AritegLink,
+    val committedObjectLink: AritegLink,
     val authorLink: AritegLink,
 ) : AbstractAritegObject() {
     companion object : AbstractAritegObjectCompanion<CommitObject>(ObjectType.COMMIT) {
         override fun toInstance(proto: AritegObject): CommitObject {
             return CommitObject(
-                type = proto.commitData.type,
                 unixTimestamp = proto.commitData.unixTimestamp,
                 message = proto.commitData.message,
-                parentLink = proto.linksList.find { it.name == "parent" }!!,
-                commitObjectLink = proto.linksList.find { it.name == "object" }!!,
-                authorLink = proto.linksList.find { it.name == "author" }!!,
+                parentLink = proto.commitData.parent,
+                committedObjectLink = proto.commitData.committedObject,
+                authorLink = proto.commitData.author,
             )
         }
     }
@@ -100,14 +98,13 @@ data class CommitObject(
             .setType(ObjectType.COMMIT)
             .setCommitData(
                 CommitData.newBuilder()
-                    .setType(type)
                     .setUnixTimestamp(unixTimestamp)
                     .setMessage(message)
+                    .setParent(parentLink)
+                    .setCommittedObject(committedObjectLink)
+                    .setAuthor(authorLink)
                     .build()
             )
-            .addLinks(parentLink)
-            .addLinks(commitObjectLink)
-            .addLinks(authorLink)
             .build()
     }
 }
