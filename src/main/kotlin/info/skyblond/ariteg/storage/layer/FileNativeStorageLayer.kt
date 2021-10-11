@@ -69,3 +69,26 @@ package info.skyblond.ariteg.storage.layer
 //        }
 //    }
 //}
+// /**
+//     * Parse a Base58 multihash [String] into a [AritegLink].
+//     *
+//     * This is designed for clients that need perform additional check,
+//     * or some other actions when user querying a base58 multihash.
+//     *
+//     * Can throw exceptions something goes wrong. Also, it can return null
+//     * if the client want to ensure all links returned is valid.
+//     *
+//     * The default implementation just decode and feed the multihash into Ariteg link.
+//     * No further check is performed.
+//     * */
+//    fun parse(multihashString: String): AritegLink? {
+//        val bytestring = ByteString.copyFrom(Multihash.fromBase58(multihashString).toBytes())
+//        return AritegLink.newBuilder()
+//            .setMultihash(bytestring)
+//            .build()
+//    }
+//fun AritegObject.toMultihashBase58(): String {
+//    val rawBytes = this.toByteArray()
+//    val multihash = doSHA3Multihash512(rawBytes)
+//    return multihash.toBase58()
+//}

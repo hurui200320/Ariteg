@@ -10,7 +10,7 @@ import java.util.concurrent.Future
  * I/O requests. Like writing proto into disk/S3/something else, or read proto
  * from somewhere.
  * */
-interface ProtoStorageService {
+interface ProtoStorageService : AutoCloseable {
     /**
      * Store a proto to the storage, return a link with the given name.
      *

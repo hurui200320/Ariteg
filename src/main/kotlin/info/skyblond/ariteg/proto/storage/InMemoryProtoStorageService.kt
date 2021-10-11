@@ -3,46 +3,39 @@ package info.skyblond.ariteg.proto.storage
 import com.google.protobuf.ByteString
 import info.skyblond.ariteg.AritegLink
 import info.skyblond.ariteg.AritegObject
-import info.skyblond.ariteg.ObjectType
 import info.skyblond.ariteg.multihash.MultihashProvider
 import info.skyblond.ariteg.objects.toMultihash
 import io.ipfs.multihash.Multihash
-import java.io.File
-import java.util.concurrent.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
+import java.util.concurrent.atomic.AtomicLong
 
-class FileProtoStorageService(
-    private val baseDir: File,
-    threadNum: Int,
-    /**
-     * Two different hash provider is required for detecting
-     * hash collision. This is not fully eliminate the chance of
-     * hash collision, but should work in almost all time.
-     *
-     * The primary provider should use a secure hash as possible as it can.
-     * The secondary provider should be fast, like blake2b or blake3. It is calculated
-     * to check if the content is the same. If the secondary hash gives different
-     * result, then primary hash collision is detected, an error will be thrown,
-     * the write request will be rejected.
-     * */
+/**
+ * This is a standard implementation reference for [ProtoStorageService].
+ * It uses [ConcurrentHashMap] to prevent corruption when clients writing to same
+ * file/key/whatever you call it.
+ * Thus, it can be used as a reference when implementing other services.
+ *
+ * Since it stores all data in memory, it is only a prototype.
+ *
+ * @see [info.skyblond.ariteg.proto.meta.InMemoryProtoMetaService]
+ * */
+class InMemoryProtoStorageService(
     private val primaryMultihashProvider: MultihashProvider,
     private val secondaryMultihashProvider: MultihashProvider,
-    // baseDir, type, primary hash
-    private val multihashToFileMapper: (File, ObjectType, Multihash) -> File = { b, t, k ->
-        File(File(b, t.name.lowercase()).also { it.mkdirs() }, k.toBase58())
-    }
-) : AsyncProtoStorageService {
-    private val queue = LinkedBlockingQueue<Runnable>(Int.MAX_VALUE)
-    private val threadPool = ThreadPoolExecutor(
-        threadNum, threadNum,
-        0L, TimeUnit.MILLISECONDS,
-        queue
-    )
+) : ProtoStorageService {
+    private val storage = ConcurrentHashMap<Multihash, AritegObject>()
+
+    private val writeCounter = AtomicLong(0)
+
+    fun getWriteCount(): Long = writeCounter.get()
 
     override fun getPrimaryMultihashType(): Multihash.Type = primaryMultihashProvider.getType()
 
     override fun getSecondaryMultihashType(): Multihash.Type = secondaryMultihashProvider.getType()
 
-    override fun getPendingWriteRequestCount(): Int = queue.size
+    override fun close() = Unit
 
     override fun storeProto(
         name: String,
@@ -55,20 +48,18 @@ class FileProtoStorageService(
         // calculate multihash
         val primaryMultihash = primaryMultihashProvider.digest(rawBytes)
 
-        val future = threadPool.submit(Callable {
+        val future = FutureTask {
             // calculate secondary hash
             val secondaryMultihash = secondaryMultihashProvider.digest(rawBytes)
-            // build the link
-
             // run the check, return if we get false
             if (check(primaryMultihash, secondaryMultihash)) {
-                // check pass, add request into queue
-                val file = multihashToFileMapper(baseDir, proto.type, primaryMultihash)
-                file.writeBytes(rawBytes)
+                writeCounter.incrementAndGet()
+                storage[primaryMultihash] = proto
                 // write done, run callback
                 callback(primaryMultihash)
             }
-        })
+        }.also { it.run() } // run the task in current thread
+
         return AritegLink.newBuilder()
             .setName(name)
             .setMultihash(ByteString.copyFrom(primaryMultihash.toBytes()))
@@ -76,9 +67,7 @@ class FileProtoStorageService(
             .build() to future
     }
 
-
-    override fun linkExists(link: AritegLink): Boolean =
-        multihashToFileMapper(baseDir, link.type, link.multihash.toMultihash()).exists()
+    override fun linkExists(link: AritegLink): Boolean = storage[link.multihash.toMultihash()] != null
 
     override fun prepareLink(link: AritegLink, option: ProtoStorageService.PrepareOption) {
         if (!linkExists(link))
@@ -94,10 +83,9 @@ class FileProtoStorageService(
 
     override fun loadProto(link: AritegLink): AritegObject {
         val multihash = link.multihash.toMultihash()
-        val file = multihashToFileMapper(baseDir, link.type, multihash)
-        if (!file.exists())
-            throw ObjectNotFoundException(link)
-        val rawBytes = file.readBytes()
+        val result = storage[multihash] ?: throw ObjectNotFoundException(link)
+
+        val rawBytes = result.toByteArray()
         // check loaded hash
         val loadedHash = when (multihash.type) {
             primaryMultihashProvider.getType() -> primaryMultihashProvider.digest(rawBytes)
@@ -107,17 +95,10 @@ class FileProtoStorageService(
             )
         }
         if (multihash != loadedHash) throw MultihashNotMatchException(multihash, loadedHash)
-        return AritegObject.parseFrom(rawBytes)
+        return result
     }
 
     override fun deleteProto(link: AritegLink): Boolean {
-        if (!linkExists(link))
-            throw ObjectNotFoundException(link)
-        return multihashToFileMapper(baseDir, link.type, link.multihash.toMultihash()).delete()
-    }
-
-    override fun close() {
-        threadPool.shutdown()
-        threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.HOURS)
+        return storage.remove(link.multihash.toMultihash()) != null
     }
 }

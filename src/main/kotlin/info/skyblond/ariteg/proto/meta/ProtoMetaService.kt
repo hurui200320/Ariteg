@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * This interface only require atomic for those request, most of the databases
  * should be able to satisfied that.
  * */
-interface ProtoMetaService {
+interface ProtoMetaService : AutoCloseable {
 
     @Serializable
     data class Entry(

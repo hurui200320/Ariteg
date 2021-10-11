@@ -1,41 +1,32 @@
-package info.skyblond.ariteg.proto.meta.mapdb
+package info.skyblond.ariteg.proto.meta
 
 import info.skyblond.ariteg.ObjectType
-import info.skyblond.ariteg.proto.meta.ProtoMetaService
 import io.ipfs.multihash.Multihash
-import org.mapdb.DBMaker
-import java.io.File
-import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.ConcurrentHashMap
 
-class MapDBProtoMetaService(
-    dbFile: File
-) : ProtoMetaService {
-    // The transaction used in mapdb is not ACID transactions.
-    // It just flushes data into disk so the data won't get corrupted.
-    private val db = DBMaker.fileDB(dbFile)
-        .fileMmapEnableIfSupported()
-        .transactionEnable()
-        .make()
-
-    private val objectMultihashMap: ConcurrentMap<Multihash, ProtoMetaService.Entry> = db
-        .hashMap("proto_entry_map", SerializerMultihash(), SerializerMetaEntry())
-        .createOrOpen()
-
-    override fun close() {
-        db.close()
-    }
+/**
+ * This is a standard implementation reference for [ProtoMetaService].
+ * It uses [ConcurrentHashMap]'s atomic to implement the methods.
+ * Thus, it can be used as a reference when implementing other services.
+ *
+ * Since it stores all data in memory, it is only a prototype.
+ *
+ * @see [info.skyblond.ariteg.proto.storage.InMemoryProtoStorageService]
+ * */
+class InMemoryProtoMetaService : ProtoMetaService {
+    private val concurrentHashMap = ConcurrentHashMap<Multihash, ProtoMetaService.Entry>()
 
     override fun getByPrimaryMultihash(primaryMultihash: Multihash): ProtoMetaService.Entry? =
-        objectMultihashMap[primaryMultihash]
+        concurrentHashMap[primaryMultihash]
 
     override fun compareAndSetTempFlag(primaryMultihash: Multihash, oldValue: Long, newValue: Long?): Long? {
-        val result = objectMultihashMap.computeIfPresent(primaryMultihash) { k, v ->
+        val result = concurrentHashMap.computeIfPresent(primaryMultihash) { k, v ->
+            assert(k == primaryMultihash)
             if (v.temp == oldValue)
                 v.copy(temp = newValue)
             else
                 v
         }
-        db.commit()
         // result will be:
         //      newValue if we replace successfully
         //      oldValue if we failed to replace
@@ -52,14 +43,15 @@ class MapDBProtoMetaService(
         val entry = ProtoMetaService.Entry(
             primaryMultihash, secondaryMultihash, type, temp
         )
-        db.commit()
         // if we got null, then return the new created entry
         // else we return the old value (returned by putIfAbsent)
-        return objectMultihashMap.putIfAbsent(
+        return concurrentHashMap.putIfAbsent(
             primaryMultihash, entry
         ) ?: entry
     }
 
     override fun deleteByPrimaryMultihash(primaryMultihash: Multihash): ProtoMetaService.Entry? =
-        objectMultihashMap.remove(primaryMultihash)
+        concurrentHashMap.remove(primaryMultihash)
+
+    override fun close() = Unit
 }

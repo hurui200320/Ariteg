@@ -19,13 +19,6 @@ object MultihashProviders {
         }
     }
 
-    @JvmStatic
-    fun md5Provider(): MultihashJavaProvider {
-        return MultihashJavaProvider(Multihash.Type.md5) {
-            MessageDigest.getInstance("MD5")
-        }
-    }
-
     // TODO Blake3 in multihash still in draft
 //    fun blake3Provider(): MultihashBouncyCastleProvider {
 //        return MultihashBouncyCastleProvider(Multihash.Type.blake3) {

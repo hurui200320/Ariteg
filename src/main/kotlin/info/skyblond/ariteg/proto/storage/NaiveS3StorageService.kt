@@ -27,7 +27,7 @@ class NaiveS3StorageService(
     private val multihashToKeyMapper: (ObjectType, Multihash) -> String = { t, k ->
         t.name.lowercase() + "/" + k.toBase58()
     }
-) : AsyncProtoStorageService, AutoCloseable {
+) : AsyncProtoStorageService {
     init {
         // will throw exception if bucket not exists
         s3Client.headBucket(
