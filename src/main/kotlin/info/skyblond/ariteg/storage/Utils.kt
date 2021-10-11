@@ -1,11 +1,5 @@
 package info.skyblond.ariteg.storage
 
-import com.google.protobuf.ByteString
-import info.skyblond.ariteg.AritegLink
-import io.ipfs.multihash.Multihash
-
-
-
 
 //fun AritegObject.toMultihashBase58(): String {
 //    val rawBytes = this.toByteArray()

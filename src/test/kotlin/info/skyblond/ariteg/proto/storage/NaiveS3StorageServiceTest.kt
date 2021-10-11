@@ -1,20 +1,18 @@
-package info.skyblond.ariteg.proto
+package info.skyblond.ariteg.proto.storage
 
 import info.skyblond.ariteg.multihash.MultihashProviders
+import info.skyblond.ariteg.proto.*
 import info.skyblond.ariteg.proto.meta.mapdb.MapDBProtoMetaService
-import info.skyblond.ariteg.proto.storage.FileProtoStorageService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
 import java.io.File
-import java.util.concurrent.Callable
-import java.util.concurrent.CyclicBarrier
-import java.util.concurrent.Executors
 import kotlin.random.Random
 
-
-class ProtoWriteServiceTest {
+internal class NaiveS3StorageServiceTest {
     private val logger = LoggerFactory.getLogger(ProtoWriteServiceTest::class.java)
     private val defaultBlobSize = 4 * 1024 // 4KB
     private val defaultListSize = 32
@@ -22,14 +20,20 @@ class ProtoWriteServiceTest {
     private val dataBaseDir = File("./data/test_data_dir_${System.currentTimeMillis()}_${Random.nextInt()}")
     private val sha3Provider512 = MultihashProviders.sha3Provider512()
 
-    private val storageService: FileProtoStorageService
+    private val s3Client: S3Client
+    private val storageService: NaiveS3StorageService
     private val metaService: MapDBProtoMetaService
     private val protoService: ProtoWriteService
 
     init {
         dataBaseDir.mkdirs()
-        storageService = FileProtoStorageService(
-            dataBaseDir, 16, MultihashProviders.sha3Provider512(), MultihashProviders.blake2b512Provider()
+        s3Client = S3Client.builder()
+            .region(Region.US_WEST_2)
+            .httpClientBuilder(getProxyApacheClientBuilder())
+            .build()
+        storageService = NaiveS3StorageService(
+            s3Client, "skyblond-ariteg-develop-test-202110", 16,
+            MultihashProviders.sha3Provider512(), MultihashProviders.blake2b512Provider()
         )
         metaService = MapDBProtoMetaService(File(dataBaseDir, "client.db"))
         protoService = object : ProtoWriteService(metaService, storageService, 5000) {}
@@ -43,11 +47,10 @@ class ProtoWriteServiceTest {
         metaService.close()
         // clean files
         dataBaseDir.deleteRecursively()
+        // stop s3
+        s3Client.close()
     }
 
-    /**
-     * Basic function test
-     * */
     @Test
     fun testChunkFunction() {
         listOf(
@@ -71,42 +74,5 @@ class ProtoWriteServiceTest {
             val loadedHash = simpleRead(storageService, link).use { sha3Provider512.digest(it, 4096 * 1024) }
             Assertions.assertEquals(targetHash, loadedHash)
         }
-    }
-
-    @Test
-    fun testChunkMultiThread() {
-        val pieceCount = defaultListSize + 1
-        val file = prepareTestFile(defaultBlobSize.toLong() * pieceCount)
-        val threadCount = 80
-        val executor = Executors.newCachedThreadPool()
-        val barrier = CyclicBarrier(threadCount + 1)
-        val futureList = (1..threadCount).map {
-            executor.submit(Callable {
-                file.inputStream().use {
-                    barrier.await()
-                    // start and the same time
-                    protoService.writeChunk("", it, defaultBlobSize, defaultListSize)
-                }
-            })
-        }
-        barrier.await()
-        logger.info("Barrier passed")
-
-        val result = futureList.map { task ->
-            task.get()
-        }
-        Assertions.assertEquals(1, result.map { it.first }.distinct().size)
-        Assertions.assertDoesNotThrow {
-            // check every writing request
-            result.flatMap { it.second }.forEach { it.get() }
-        }
-        // extra 1 for additional list objects
-        // link -> list -> (list, blob)
-        //                    |
-        //                    +-> (blob x listSize)
-        // Be careful with the type
-        Assertions.assertEquals(pieceCount + 2L, storageService.writeCounter.get())
-        logger.info("Done, write count: ${storageService.writeCounter.get()}")
-        executor.shutdown()
     }
 }

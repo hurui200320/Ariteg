@@ -38,7 +38,7 @@ class FileProtoStorageService(
         0L, TimeUnit.MILLISECONDS,
         queue
     )
-
+    // for test only
     internal val writeCounter = AtomicLong(0)
 
     override fun getPrimaryMultihashType(): Multihash.Type = primaryMultihashProvider.getType()

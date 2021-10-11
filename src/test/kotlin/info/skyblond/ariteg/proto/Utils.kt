@@ -3,12 +3,18 @@ package info.skyblond.ariteg.proto
 import info.skyblond.ariteg.AritegLink
 import info.skyblond.ariteg.AritegObject
 import info.skyblond.ariteg.ObjectType
-import info.skyblond.ariteg.proto.storage.FileProtoStorageService
+import info.skyblond.ariteg.proto.storage.ProtoStorageService
+import software.amazon.awssdk.http.apache.ApacheHttpClient
+import software.amazon.awssdk.http.apache.ProxyConfiguration
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.InputStream
+import java.net.URI
+import kotlin.math.min
+import kotlin.random.Random
 
 fun simpleRead(
-    storageService: FileProtoStorageService, target: AritegLink
+    storageService: ProtoStorageService, target: AritegLink
 ): InputStream {
     val proto = storageService.loadProto(target)
     // Is blob, return the data as input stream
@@ -63,5 +69,27 @@ fun simpleRead(
             return result
         }
     }
+}
 
+fun getProxyApacheClientBuilder(): ApacheHttpClient.Builder {
+    return ApacheHttpClient.builder()
+        .proxyConfiguration(
+            ProxyConfiguration.builder()
+                .endpoint(URI.create("http://127.0.0.1:1081"))
+                .build()
+        )
+}
+
+fun prepareTestFile(size: Long): File {
+    val file = File.createTempFile(System.currentTimeMillis().toString(), System.nanoTime().toString())
+    val buffer = ByteArray(4096) // 4KB
+    file.outputStream().use { outputStream ->
+        var counter = 0L
+        while (counter < size) {
+            Random.nextBytes(buffer)
+            outputStream.write(buffer, 0, min(buffer.size.toLong(), size - counter).toInt())
+            counter += buffer.size
+        }
+    }
+    return file
 }
