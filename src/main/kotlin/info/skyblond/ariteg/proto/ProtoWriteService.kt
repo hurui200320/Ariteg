@@ -72,12 +72,11 @@ abstract class ProtoWriteService(
         }) { primaryHash ->
             // writing is done, remove temp.
             // get the old value first
-            var oldValue = metaService.compareAndSetTempFlag(primaryHash, 0L, null)
-            while (oldValue != null) {
-                oldValue = metaService.compareAndSetTempFlag(primaryHash, oldValue, null)
+            metaService.compareAndSetTempFlag(primaryHash, 0L, null)?.let {
+                metaService.compareAndSetTempFlag(primaryHash, it, null)
             }
-            // once compareAndSetTempFlag return null
-            // the replacement is done
+            // it's ok to fail.
+            // Failed means someone locked the obj and will finish this obj.
         }
 
     /**

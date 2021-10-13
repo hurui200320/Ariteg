@@ -203,10 +203,13 @@ abstract class AbstractProtoServiceTest(
         //                       |
         //                       +-> (blobObj x listSize)
         // Be careful with the type
-        Assertions.assertEquals(
-            pieceCount + 2L,
-            (storageService as InMemoryProtoStorageService).getWriteCount()
+        Assertions.assertTrue(
+            pieceCount + 2L <= (storageService as InMemoryProtoStorageService).getWriteCount()
         )
+        // chunk data test ensure the data is writing correct, the storage backend
+        // should prevent data corruption when writing to the same obj at the same time
+        // Thus, the writing counter is pieceCount + 2L when no racing is occurred
+        // otherwise, some data might be duplicated but won't corrupt the data
         executor.shutdown()
     }
 }

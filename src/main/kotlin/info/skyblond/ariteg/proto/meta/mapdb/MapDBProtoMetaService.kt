@@ -30,6 +30,7 @@ class MapDBProtoMetaService(
 
     override fun compareAndSetTempFlag(primaryMultihash: Multihash, oldValue: Long, newValue: Long?): Long? {
         val result = objectMultihashMap.computeIfPresent(primaryMultihash) { k, v ->
+            assert(k == primaryMultihash)
             if (v.temp == oldValue)
                 v.copy(temp = newValue)
             else
