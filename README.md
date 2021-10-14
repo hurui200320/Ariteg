@@ -19,11 +19,11 @@ of them otherwise you won't recreate your data.
 This program is not well-tested, and potentially corrupt your data. So use it in
 your own risk.
 
-Anyway, I wrote this program because I need someway to store ~40 TB of video files,
+Anyway, I wrote this program because I need someway to store \~40 TB of video files,
 where I cannot host my own NAS (for a lot of reasons) and have to store them to
 AWS S3. Since they are very cold data and don't need to frequently access, so I'll
 store them using Glacier Deep Archive, which offers the cheapest price but need
-12~48 hours to prepare the data before it's ready to read.
+12\~48 hours to prepare the data before it's ready to read.
 
 Although it's the cheapest tier, 40 TB still cost me 40 USD per month, and everyone
 knows that video files are hard to compress, so I came up the idea to store them
