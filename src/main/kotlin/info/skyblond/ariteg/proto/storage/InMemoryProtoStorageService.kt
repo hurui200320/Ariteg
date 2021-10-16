@@ -6,9 +6,8 @@ import info.skyblond.ariteg.AritegObject
 import info.skyblond.ariteg.multihash.MultihashProvider
 import info.skyblond.ariteg.objects.toMultihash
 import io.ipfs.multihash.Multihash
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Future
-import java.util.concurrent.FutureTask
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -40,25 +39,24 @@ class InMemoryProtoStorageService(
     override fun storeProto(
         name: String,
         proto: AritegObject,
-        check: (Multihash, Multihash) -> Boolean,
-        callback: (Multihash) -> Unit
-    ): Pair<AritegLink, Future<Unit>> {
+        check: (Multihash, Multihash) -> Boolean
+    ): Pair<AritegLink, CompletableFuture<Multihash?>> {
         // get raw bytes
         val rawBytes = proto.toByteArray()
         // calculate multihash
         val primaryMultihash = primaryMultihashProvider.digest(rawBytes)
 
-        val future = FutureTask {
+        val future = CompletableFuture.supplyAsync {
             // calculate secondary hash
             val secondaryMultihash = secondaryMultihashProvider.digest(rawBytes)
             // run the check, return if we get false
             if (check(primaryMultihash, secondaryMultihash)) {
                 writeCounter.incrementAndGet()
                 storage[primaryMultihash] = proto
-                // write done, run callback
-                callback(primaryMultihash)
+                return@supplyAsync primaryMultihash
             }
-        }.also { it.run() } // run the task in current thread
+            return@supplyAsync null
+        }
 
         return AritegLink.newBuilder()
             .setName(name)

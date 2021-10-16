@@ -17,6 +17,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.Callable
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import kotlin.math.min
@@ -75,7 +76,7 @@ abstract class AbstractProtoServiceTest(
         }
         // wait all writing is finished
         Assertions.assertDoesNotThrow {
-            futureList.forEach { it.get() }
+            CompletableFuture.allOf(*futureList.toTypedArray()).get()
         }
         return link
     }
@@ -196,7 +197,7 @@ abstract class AbstractProtoServiceTest(
         Assertions.assertEquals(1, result.map { it.first }.distinct().size)
         // check every writing request success
         Assertions.assertDoesNotThrow {
-            result.flatMap { it.second }.forEach { it.get() }
+            CompletableFuture.allOf(*result.flatMap { it.second }.toTypedArray()).get()
         }
         // extra 1 for additional list objects
         // link -> listObj -> (listObj, blobObj)

@@ -5,7 +5,7 @@ import info.skyblond.ariteg.AritegObject
 import info.skyblond.ariteg.ObjectType
 import info.skyblond.ariteg.proto.ProtoWriteService
 import java.io.File
-import java.util.concurrent.Future
+import java.util.concurrent.CompletableFuture
 
 abstract class FileWriteService(
     protected val metaService: FileIndexService,
@@ -31,12 +31,12 @@ abstract class FileWriteService(
             protoWriteService.writeChunk("", it, blobSize, listSize)
         }
         // wait all write is done
-        futureList.forEach { it.get() }
+        CompletableFuture.allOf(*futureList.toTypedArray()).get()
         return FileIndexService.Entry.createEntry(prefix, name, link)
     }
 
-    protected fun storeDir(dir: File): Pair<AritegObject, List<Future<Unit>>> {
-        val linksAndFutures: List<Pair<AritegLink, List<Future<Unit>>>> =
+    protected fun storeDir(dir: File): Pair<AritegObject, List<CompletableFuture<Void>>> {
+        val linksAndFutures: List<Pair<AritegLink, List<CompletableFuture<Void>>>> =
             dir.listFiles()!!.map { f ->
                 if (f.isDirectory) {
                     storeDir(f).let { (proto, list) ->
@@ -63,8 +63,7 @@ abstract class FileWriteService(
         require(folder.isDirectory) { "$folder is not a folder." }
         val (obj, futures) = storeDir(folder)
         val (link, future) = protoWriteService.writeProto("", obj)
-        futures.forEach { it.get() }
-        future.get()
+        CompletableFuture.allOf(*futures.toTypedArray(), future).get()
         return FileIndexService.Entry.createEntry(prefix, name, link)
     }
 }

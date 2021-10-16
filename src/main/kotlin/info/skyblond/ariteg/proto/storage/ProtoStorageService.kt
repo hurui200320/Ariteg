@@ -3,6 +3,7 @@ package info.skyblond.ariteg.proto.storage
 import info.skyblond.ariteg.AritegLink
 import info.skyblond.ariteg.AritegObject
 import io.ipfs.multihash.Multihash
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 
 /**
@@ -17,8 +18,6 @@ interface ProtoStorageService : AutoCloseable {
      * The [check] (primary hash, secondary hash) will be called before writing
      * the proto, return false will cancel this request. You can check and set
      * metadata here, and cancel the request if the proto has already exists.
-     * The [callback] (primary hash) is executed after the writing request is done. You can set
-     * some flag after the writing is succeeded.
      *
      * Storing existing proto should have no bad side effects, since the proto
      * is immutable.
@@ -27,8 +26,7 @@ interface ProtoStorageService : AutoCloseable {
         name: String,
         proto: AritegObject,
         check: (Multihash, Multihash) -> Boolean,
-        callback: (Multihash) -> Unit
-    ): Pair<AritegLink, Future<Unit>>
+    ): Pair<AritegLink, CompletableFuture<Multihash?>>
 
     /**
      * Check if the target proto exists on the backend.

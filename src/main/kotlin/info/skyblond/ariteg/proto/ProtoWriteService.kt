@@ -9,7 +9,9 @@ import info.skyblond.ariteg.objects.TreeObject
 import info.skyblond.ariteg.proto.meta.ProtoMetaService
 import info.skyblond.ariteg.proto.storage.MultihashNotMatchException
 import info.skyblond.ariteg.proto.storage.ProtoStorageService
+import io.ipfs.multihash.Multihash
 import java.io.InputStream
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
@@ -26,8 +28,8 @@ abstract class ProtoWriteService(
     /**
      * Write a proto into system and properly set the metadata
      * */
-    fun writeProto(name: String, proto: AritegObject): Pair<AritegLink, Future<Unit>> =
-        storageService.storeProto(name, proto, { primaryHash, secondaryHash ->
+    fun writeProto(name: String, proto: AritegObject): Pair<AritegLink, CompletableFuture<Void>> =
+        storageService.storeProto(name, proto) { primaryHash, secondaryHash ->
             val token = Random.nextLong()
             // save the entry
             var entry = metaService.saveIfPrimaryMultihashNotExists(
@@ -69,14 +71,18 @@ abstract class ProtoWriteService(
                 }
             }
             false
-        }) { primaryHash ->
-            // writing is done, remove temp.
-            // get the old value first
-            metaService.compareAndSetTempFlag(primaryHash, 0L, null)?.let {
-                metaService.compareAndSetTempFlag(primaryHash, it, null)
+        }.let { result ->
+            result.first to result.second.thenAccept { primaryHash ->
+                if (primaryHash != null) {
+                    // writing is done, remove temp.
+                    // get the old value first
+                    metaService.compareAndSetTempFlag(primaryHash, 0L, null)?.let {
+                        metaService.compareAndSetTempFlag(primaryHash, it, null)
+                    }
+                    // it's ok to fail.
+                    // Failed means someone locked the obj and will finish this obj.
+                }
             }
-            // it's ok to fail.
-            // Failed means someone locked the obj and will finish this obj.
         }
 
     /**
@@ -86,8 +92,8 @@ abstract class ProtoWriteService(
     fun writeChunk(
         name: String, inputStream: InputStream,
         blobSize: Int, listLength: Int
-    ): Pair<AritegLink, List<Future<Unit>>> {
-        val futureList = mutableListOf<Future<Unit>>()
+    ): Pair<AritegLink, List<CompletableFuture<Void>>> {
+        val futureList = mutableListOf<CompletableFuture<Void>>()
         val linkList = mutableListOf<AritegLink>()
         var actualCount: Int
         // This will at least store 1 blob.
@@ -135,7 +141,7 @@ abstract class ProtoWriteService(
     /**
      * Pack a list of link into a tree object.
      * */
-    fun packLinks(name: String, links: List<AritegLink>): Pair<AritegLink, Future<Unit>> =
+    fun packLinks(name: String, links: List<AritegLink>): Pair<AritegLink, CompletableFuture<Void>> =
         writeProto(
             name, TreeObject(links).toProto()
         )
@@ -147,7 +153,7 @@ abstract class ProtoWriteService(
         name: String, unixTimestamp: Long,
         message: String, parentLink: AritegLink,
         committedObjectLink: AritegLink, authorLink: AritegLink
-    ): Pair<AritegLink, Future<Unit>> = writeProto(
+    ): Pair<AritegLink, CompletableFuture<Void>> = writeProto(
         name, CommitObject(
             unixTimestamp, message, parentLink, committedObjectLink, authorLink
         ).toProto()

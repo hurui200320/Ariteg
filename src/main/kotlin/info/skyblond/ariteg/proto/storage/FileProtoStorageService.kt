@@ -26,49 +26,47 @@ class FileProtoStorageService(
      * */
     private val primaryMultihashProvider: MultihashProvider,
     private val secondaryMultihashProvider: MultihashProvider,
+    private val queueSize: Int = 64,
     // baseDir, type, primary hash
     private val multihashToFileMapper: (File, ObjectType, Multihash) -> File = { b, t, k ->
         File(File(b, t.name.lowercase()).also { it.mkdirs() }, k.toBase58())
     }
-) : AsyncProtoStorageService {
-    private val queue = LinkedBlockingQueue<Runnable>(Int.MAX_VALUE)
+) : ProtoStorageService {
+    private val queue = LinkedBlockingQueue<Runnable>(queueSize)
     private val threadPool = ThreadPoolExecutor(
         threadNum, threadNum,
         0L, TimeUnit.MILLISECONDS,
-        queue
+        queue, ThreadPoolExecutor.CallerRunsPolicy()
     )
 
     override fun getPrimaryMultihashType(): Multihash.Type = primaryMultihashProvider.getType()
 
     override fun getSecondaryMultihashType(): Multihash.Type = secondaryMultihashProvider.getType()
 
-    override fun getPendingWriteRequestCount(): Int = queue.size
-
     override fun storeProto(
         name: String,
         proto: AritegObject,
         check: (Multihash, Multihash) -> Boolean,
-        callback: (Multihash) -> Unit
-    ): Pair<AritegLink, Future<Unit>> {
+    ): Pair<AritegLink, CompletableFuture<Multihash?>> {
         // get raw bytes
         val rawBytes = proto.toByteArray()
         // calculate multihash
         val primaryMultihash = primaryMultihashProvider.digest(rawBytes)
 
-        val future = threadPool.submit(Callable {
+        val future = CompletableFuture.supplyAsync({
             // calculate secondary hash
             val secondaryMultihash = secondaryMultihashProvider.digest(rawBytes)
-            // build the link
-
             // run the check, return if we get false
             if (check(primaryMultihash, secondaryMultihash)) {
                 // check pass, add request into queue
                 val file = multihashToFileMapper(baseDir, proto.type, primaryMultihash)
                 file.writeBytes(rawBytes)
-                // write done, run callback
-                callback(primaryMultihash)
+                primaryMultihash
+            } else {
+                null
             }
-        })
+        }, threadPool)
+
         return AritegLink.newBuilder()
             .setName(name)
             .setMultihash(ByteString.copyFrom(primaryMultihash.toBytes()))

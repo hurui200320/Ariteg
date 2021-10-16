@@ -11,7 +11,10 @@ import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.utils.Md5Utils
-import java.util.concurrent.*
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /**
  * A naive S3 storage is implement for basic usage. Advanced S3 features
@@ -24,10 +27,11 @@ class NaiveS3StorageService(
     private val primaryMultihashProvider: MultihashProvider,
     private val secondaryMultihashProvider: MultihashProvider,
     // type, primary hash
+    private val queueSize: Int = 64,
     private val multihashToKeyMapper: (ObjectType, Multihash) -> String = { t, k ->
         t.name.lowercase() + "/" + k.toBase58()
     }
-) : AsyncProtoStorageService {
+) : ProtoStorageService {
     init {
         // will throw exception if bucket not exists
         s3Client.headBucket(
@@ -43,31 +47,28 @@ class NaiveS3StorageService(
     @Volatile
     var uploadStorageClass: StorageClass = StorageClass.STANDARD
 
-    private val queue = LinkedBlockingQueue<Runnable>(Int.MAX_VALUE)
+    private val queue = LinkedBlockingQueue<Runnable>(queueSize)
     private val threadPool = ThreadPoolExecutor(
         threadNum, threadNum,
         0L, TimeUnit.MILLISECONDS,
-        queue
+        queue, ThreadPoolExecutor.CallerRunsPolicy()
     )
 
     override fun getPrimaryMultihashType(): Multihash.Type = primaryMultihashProvider.getType()
 
     override fun getSecondaryMultihashType(): Multihash.Type = secondaryMultihashProvider.getType()
 
-    override fun getPendingWriteRequestCount(): Int = queue.size
-
     override fun storeProto(
         name: String,
         proto: AritegObject,
         check: (Multihash, Multihash) -> Boolean,
-        callback: (Multihash) -> Unit
-    ): Pair<AritegLink, Future<Unit>> {
+    ): Pair<AritegLink, CompletableFuture<Multihash?>> {
         // get raw bytes
         val rawBytes = proto.toByteArray()
         // calculate multihash
         val primaryMultihash = primaryMultihashProvider.digest(rawBytes)
 
-        val future = threadPool.submit(Callable {
+        val future = CompletableFuture.supplyAsync({
             // calculate secondary hash
             val secondaryMultihash = secondaryMultihashProvider.digest(rawBytes)
             // run the check, return if we get false
@@ -82,10 +83,12 @@ class NaiveS3StorageService(
                         .build(),
                     RequestBody.fromBytes(rawBytes)
                 )
-                // write done, run callback
-                callback(primaryMultihash)
+                primaryMultihash
+            } else {
+                null
             }
-        })
+        }, threadPool)
+
         return AritegLink.newBuilder()
             .setName(name)
             .setMultihash(ByteString.copyFrom(primaryMultihash.toBytes()))
