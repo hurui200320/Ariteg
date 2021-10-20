@@ -31,7 +31,7 @@ class PrototypeWritingTest {
             MultihashProviders.sha3Provider512(), MultihashProviders.blake2b512Provider()
         )
         val protoWriteService = object : ProtoWriteService(
-            protoMetaService, protoStorageService, 5_000
+            protoMetaService, protoStorageService, { 5_000 }
         ) {}
         val fileIndexService = InMemoryFileIndexService(protoMetaService)
         val fileWriteService = object : FileWriteService(

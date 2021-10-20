@@ -15,7 +15,7 @@ class MapDBProtoServiceTest : AbstractProtoServiceTest() {
 
     override val storageService = InMemoryProtoStorageService(primaryProvider, secondaryProvider)
     override val metaService = MapDBProtoMetaService(File(dataBaseDir, "client.db"))
-    override val protoService = object : ProtoWriteService(metaService, storageService, 5000) {}
+    override val protoService = object : ProtoWriteService(metaService, storageService, { 5000 }) {}
 
     override fun cleanUpAfterEachTest() {
         // clean files

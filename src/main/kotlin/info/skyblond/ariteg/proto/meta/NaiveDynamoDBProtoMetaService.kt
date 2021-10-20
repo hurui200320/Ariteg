@@ -4,7 +4,10 @@ import info.skyblond.ariteg.ObjectType
 import io.ipfs.multihash.Multihash
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
-import software.amazon.awssdk.services.dynamodb.model.*
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException
+import software.amazon.awssdk.services.dynamodb.model.KeyType
+import software.amazon.awssdk.services.dynamodb.model.ReturnValue
 
 /**
  * Use longer wait time if the racing condition is intense
@@ -14,21 +17,17 @@ class NaiveDynamoDBProtoMetaService(
     private val dynamoTableName: String,
 ) : ProtoMetaService {
     companion object {
-        private const val primaryHashKeyName = "primaryHash"
-        private const val secondaryHashKeyName = "secondaryHash"
-
-        // Note: `type` is a reserved keyword in DynamoDB
-        private const val typeKeyName = "objectType"
-
-        // Note: `temp` is also a reserved keyword in DynamoDB
-        private const val tempKeyName = "tempValue"
+        const val primaryHashKeyName = "primaryHash"
+        const val secondaryHashKeyName = "secondaryHash"
+        const val typeKeyName = "objectType"
+        const val tempKeyName = "tempValue"
     }
 
     init {
         // check table, ResourceNotFoundException will be thrown if table not exist.
-        val table = dynamoDbClient.describeTable(
-            DescribeTableRequest.builder().tableName(dynamoTableName).build()
-        ).table()
+        val table = dynamoDbClient.describeTable {
+            it.tableName(dynamoTableName)
+        }.table()
         assert(table.tableName() == dynamoTableName)
         assert(table.keySchema().size == 1) { "No sort key allowed" }
         val keyName = checkNotNull(
@@ -71,13 +70,11 @@ class NaiveDynamoDBProtoMetaService(
 
 
     override fun getByPrimaryMultihash(primaryMultihash: Multihash): ProtoMetaService.Entry? {
-        val resp = dynamoDbClient.getItem(
-            GetItemRequest.builder()
-                .tableName(dynamoTableName)
+        val resp = dynamoDbClient.getItem {
+            it.tableName(dynamoTableName)
                 .key(primaryMultihash.toKey())
                 .consistentRead(true)
-                .build()
-        )
+        }
         return if (resp.hasItem())
             resp.item().toEntry()
         else
@@ -86,9 +83,8 @@ class NaiveDynamoDBProtoMetaService(
 
     override fun compareAndSetTempFlag(primaryMultihash: Multihash, oldValue: Long, newValue: Long?): Long? {
         return try {
-            dynamoDbClient.updateItem(
-                UpdateItemRequest.builder()
-                    .tableName(dynamoTableName)
+            dynamoDbClient.updateItem { builder ->
+                builder.tableName(dynamoTableName)
                     .key(primaryMultihash.toKey())
                     .conditionExpression("$tempKeyName = :oldValue")
                     .updateExpression("SET $tempKeyName = :newValue")
@@ -101,8 +97,7 @@ class NaiveDynamoDBProtoMetaService(
                                 n(newValue.toString())
                         }.build()
                     })
-                    .build()
-            )
+            }
             newValue
         } catch (e: ConditionalCheckFailedException) {
             // update failed, get the latest value
@@ -123,13 +118,11 @@ class NaiveDynamoDBProtoMetaService(
             primaryMultihash, secondaryMultihash, type, temp
         )
         return try {
-            dynamoDbClient.putItem(
-                PutItemRequest.builder()
-                    .tableName(dynamoTableName)
+            dynamoDbClient.putItem {
+                it.tableName(dynamoTableName)
                     .item(entry.toItem())
                     .conditionExpression("attribute_not_exists($primaryHashKeyName)")
-                    .build()
-            )
+            }
             entry
         } catch (e: ConditionalCheckFailedException) {
             // At this time, we know the key is already exists
@@ -141,13 +134,11 @@ class NaiveDynamoDBProtoMetaService(
     }
 
     override fun deleteByPrimaryMultihash(primaryMultihash: Multihash): ProtoMetaService.Entry? {
-        val resp = dynamoDbClient.deleteItem(
-            DeleteItemRequest.builder()
-                .tableName(dynamoTableName)
+        val resp = dynamoDbClient.deleteItem {
+            it.tableName(dynamoTableName)
                 .key(primaryMultihash.toKey())
                 .returnValues(ReturnValue.ALL_OLD)
-                .build()
-        )
+        }
         return if (resp.hasAttributes())
             resp.attributes().toEntry()
         else

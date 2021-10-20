@@ -26,7 +26,7 @@ class FileProtoStorageService(
      * */
     private val primaryMultihashProvider: MultihashProvider,
     private val secondaryMultihashProvider: MultihashProvider,
-    private val queueSize: Int = 64,
+    queueSize: Int = 64,
     // baseDir, type, primary hash
     private val multihashToFileMapper: (File, ObjectType, Multihash) -> File = { b, t, k ->
         File(File(b, t.name.lowercase()).also { it.mkdirs() }, k.toBase58())

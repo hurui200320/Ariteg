@@ -15,7 +15,7 @@ class FileProtoServiceTest : AbstractProtoServiceTest() {
         dataBaseDir, Runtime.getRuntime().availableProcessors(), primaryProvider, secondaryProvider
     )
     override val metaService = InMemoryProtoMetaService()
-    override val protoService = object : ProtoWriteService(metaService, storageService, 5000) {}
+    override val protoService = object : ProtoWriteService(metaService, storageService, { 5000 }) {}
 
     override fun cleanUpAfterEachTest() {
         // clean files

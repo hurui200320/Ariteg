@@ -9,10 +9,8 @@ import info.skyblond.ariteg.objects.TreeObject
 import info.skyblond.ariteg.proto.meta.ProtoMetaService
 import info.skyblond.ariteg.proto.storage.MultihashNotMatchException
 import info.skyblond.ariteg.proto.storage.ProtoStorageService
-import io.ipfs.multihash.Multihash
 import java.io.InputStream
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
@@ -23,7 +21,7 @@ import kotlin.random.Random
 abstract class ProtoWriteService(
     protected val metaService: ProtoMetaService,
     protected val storageService: ProtoStorageService,
-    protected val timeoutMillisecond: Long,
+    protected val timeoutMsProvider: () -> Long,
 ) {
     /**
      * Write a proto into system and properly set the metadata
@@ -52,7 +50,7 @@ abstract class ProtoWriteService(
                     return@storeProto true
                 } else {
                     // someone is writing, then we wait
-                    val deadline = System.currentTimeMillis() + timeoutMillisecond
+                    val deadline = System.currentTimeMillis() + timeoutMsProvider()
                     while (System.currentTimeMillis() < deadline)
                         TimeUnit.MILLISECONDS.sleep(deadline - System.currentTimeMillis())
                     // and check the result
@@ -92,7 +90,7 @@ abstract class ProtoWriteService(
     fun writeChunk(
         name: String, inputStream: InputStream,
         blobSize: Int, listLength: Int
-    ): Pair<AritegLink, List<CompletableFuture<Void>>> {
+    ): Pair<AritegLink, CompletableFuture<Void>> {
         val futureList = mutableListOf<CompletableFuture<Void>>()
         val linkList = mutableListOf<AritegLink>()
         var actualCount: Int
@@ -134,8 +132,9 @@ abstract class ProtoWriteService(
             if (i + listLength > linkList.size) i = 0
         }
 
+        val returnedFuture = CompletableFuture.allOf(*futureList.toTypedArray())
         // The result is combine all link into one single root
-        return linkList[0].toBuilder().setName(name).build() to futureList
+        return linkList[0].toBuilder().setName(name).build() to returnedFuture
     }
 
     /**

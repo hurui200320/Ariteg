@@ -9,8 +9,12 @@ import info.skyblond.ariteg.objects.toMultihash
 import io.ipfs.multihash.Multihash
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.*
+import software.amazon.awssdk.services.s3.model.InvalidObjectStateException
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
+import software.amazon.awssdk.services.s3.model.StorageClass
+import software.amazon.awssdk.services.s3.model.Tier
 import software.amazon.awssdk.utils.Md5Utils
+import java.io.File
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -23,22 +27,17 @@ import java.util.concurrent.TimeUnit
 class NaiveS3StorageService(
     private val s3Client: S3Client,
     private val bucketName: String,
-    threadNum: Int,
     private val primaryMultihashProvider: MultihashProvider,
     private val secondaryMultihashProvider: MultihashProvider,
-    // type, primary hash
-    private val queueSize: Int = 64,
+    threadNum: Int = Runtime.getRuntime().availableProcessors(),
+    queueSize: Int = 64,
     private val multihashToKeyMapper: (ObjectType, Multihash) -> String = { t, k ->
         t.name.lowercase() + "/" + k.toBase58()
     }
 ) : ProtoStorageService {
     init {
         // will throw exception if bucket not exists
-        s3Client.headBucket(
-            HeadBucketRequest.builder()
-                .bucket(bucketName)
-                .build()
-        )
+        s3Client.headBucket { it.bucket(bucketName) }
     }
 
     /**
@@ -47,11 +46,10 @@ class NaiveS3StorageService(
     @Volatile
     var uploadStorageClass: StorageClass = StorageClass.STANDARD
 
-    private val queue = LinkedBlockingQueue<Runnable>(queueSize)
     private val threadPool = ThreadPoolExecutor(
         threadNum, threadNum,
         0L, TimeUnit.MILLISECONDS,
-        queue, ThreadPoolExecutor.CallerRunsPolicy()
+        LinkedBlockingQueue(queueSize), ThreadPoolExecutor.CallerRunsPolicy()
     )
 
     override fun getPrimaryMultihashType(): Multihash.Type = primaryMultihashProvider.getType()
@@ -64,29 +62,32 @@ class NaiveS3StorageService(
         check: (Multihash, Multihash) -> Boolean,
     ): Pair<AritegLink, CompletableFuture<Multihash?>> {
         // get raw bytes
-        val rawBytes = proto.toByteArray()
-        // calculate multihash
-        val primaryMultihash = primaryMultihashProvider.digest(rawBytes)
+        val (primaryMultihash, tempFile) = proto.toByteArray().let { rawBytes ->
+            // calculate multihash and save content to file (save memory)
+            primaryMultihashProvider.digest(rawBytes) to File.createTempFile("proto", ".tmp")
+                .apply { writeBytes(rawBytes); deleteOnExit() }
+        }
 
+        // submit task
         val future = CompletableFuture.supplyAsync({
+            val rawBytes = tempFile.readBytes()
             // calculate secondary hash
             val secondaryMultihash = secondaryMultihashProvider.digest(rawBytes)
             // run the check, return if we get false
             if (check(primaryMultihash, secondaryMultihash)) {
                 // check pass, continue request
                 s3Client.putObject(
-                    PutObjectRequest.builder()
-                        .bucket(bucketName)
-                        .key(multihashToKeyMapper(proto.type, primaryMultihash))
-                        .storageClass(uploadStorageClass)
-                        .contentMD5(Md5Utils.md5AsBase64(rawBytes))
-                        .build(),
-                    RequestBody.fromBytes(rawBytes)
+                    {
+                        it.bucket(bucketName)
+                            .key(multihashToKeyMapper(proto.type, primaryMultihash))
+                            .storageClass(uploadStorageClass)
+                            .contentMD5(Md5Utils.md5AsBase64(rawBytes))
+                    }, RequestBody.fromBytes(rawBytes)
                 )
                 primaryMultihash
             } else {
                 null
-            }
+            }.also { tempFile.delete() }
         }, threadPool)
 
         return AritegLink.newBuilder()
@@ -98,12 +99,10 @@ class NaiveS3StorageService(
 
     override fun linkExists(link: AritegLink): Boolean =
         try {
-            s3Client.headObject(
-                HeadObjectRequest.builder()
-                    .bucket(bucketName)
+            s3Client.headObject {
+                it.bucket(bucketName)
                     .key(multihashToKeyMapper(link.type, link.multihash.toMultihash()))
-                    .build()
-            )
+            }
             true
         } catch (e: NoSuchKeyException) {
             false
@@ -121,18 +120,14 @@ class NaiveS3StorageService(
         require(option is RestoreOptions) { "Expect ${RestoreOptions::class.java} but ${option::class.java}" }
 
         try {
-            s3Client.restoreObject(
-                RestoreObjectRequest.builder()
-                    .bucket(bucketName)
+            s3Client.restoreObject { builder ->
+                builder.bucket(bucketName)
                     .key(multihashToKeyMapper(link.type, link.multihash.toMultihash()))
-                    .restoreRequest(
-                        RestoreRequest.builder()
-                            .days(option.days)
+                    .restoreRequest {
+                        it.days(option.days)
                             .tier(option.tier)
-                            .build()
-                    )
-                    .build()
-            )
+                    }
+            }
         } catch (e: NoSuchKeyException) {
             throw ObjectNotFoundException(link)
         }
@@ -141,12 +136,10 @@ class NaiveS3StorageService(
 
     override fun linkAvailable(link: AritegLink): Boolean {
         val header = try {
-            s3Client.headObject(
-                HeadObjectRequest.builder()
-                    .bucket(bucketName)
+            s3Client.headObject {
+                it.bucket(bucketName)
                     .key(multihashToKeyMapper(link.type, link.multihash.toMultihash()))
-                    .build()
-            )
+            }
         } catch (e: NoSuchKeyException) {
             throw ObjectNotFoundException(link)
         }
@@ -171,12 +164,10 @@ class NaiveS3StorageService(
         val multihash = link.multihash.toMultihash()
 
         return try {
-            s3Client.getObject(
-                GetObjectRequest.builder()
-                    .bucket(bucketName)
+            s3Client.getObject {
+                it.bucket(bucketName)
                     .key(multihashToKeyMapper(link.type, link.multihash.toMultihash()))
-                    .build()
-            )
+            }
         } catch (e: NoSuchKeyException) {
             throw ObjectNotFoundException(link)
         } catch (e: InvalidObjectStateException) {
@@ -201,12 +192,10 @@ class NaiveS3StorageService(
         if (!linkExists(link))
             throw ObjectNotFoundException(link)
 
-        s3Client.deleteObject(
-            DeleteObjectRequest.builder()
-                .bucket(bucketName)
+        s3Client.deleteObject {
+            it.bucket(bucketName)
                 .key(multihashToKeyMapper(link.type, link.multihash.toMultihash()))
-                .build()
-        )
+        }
         return true
     }
 

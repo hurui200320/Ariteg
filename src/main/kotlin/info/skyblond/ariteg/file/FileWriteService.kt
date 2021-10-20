@@ -27,21 +27,21 @@ abstract class FileWriteService(
 
     protected fun writeFile(prefix: String, name: String, file: File): FileIndexService.Entry {
         require(file.isDirectory) { "$file is not a file" }
-        val (link, futureList) = file.inputStream().use {
+        val (link, future) = file.inputStream().use {
             protoWriteService.writeChunk("", it, blobSize, listSize)
         }
         // wait all write is done
-        CompletableFuture.allOf(*futureList.toTypedArray()).get()
+        future.get()
         return FileIndexService.Entry.createEntry(prefix, name, link)
     }
 
-    protected fun storeDir(dir: File): Pair<AritegObject, List<CompletableFuture<Void>>> {
-        val linksAndFutures: List<Pair<AritegLink, List<CompletableFuture<Void>>>> =
+    protected fun storeDir(dir: File): Pair<AritegObject, CompletableFuture<Void>> {
+        val linksAndFutures: List<Pair<AritegLink, CompletableFuture<Void>>> =
             dir.listFiles()!!.map { f ->
                 if (f.isDirectory) {
-                    storeDir(f).let { (proto, list) ->
-                        val (link, future) = protoWriteService.writeProto(f.name, proto)
-                        link to listOf(*list.toTypedArray(), future)
+                    storeDir(f).let { (proto, future1) ->
+                        val (link, future2) = protoWriteService.writeProto(f.name, proto)
+                        link to CompletableFuture.allOf(future1, future2)
                     }
                 } else if (f.isFile) {
                     f.inputStream().use { ins ->
@@ -56,14 +56,14 @@ abstract class FileWriteService(
             .setType(ObjectType.TREE)
             .addAllLinks(linksAndFutures.map { it.first })
             .build()
-        return treeObj to linksAndFutures.flatMap { it.second }
+        return treeObj to CompletableFuture.allOf(*linksAndFutures.map { it.second }.toTypedArray())
     }
 
     protected fun writeFolder(prefix: String, name: String, folder: File): FileIndexService.Entry {
         require(folder.isDirectory) { "$folder is not a folder." }
-        val (obj, futures) = storeDir(folder)
-        val (link, future) = protoWriteService.writeProto("", obj)
-        CompletableFuture.allOf(*futures.toTypedArray(), future).get()
+        val (obj, future1) = storeDir(folder)
+        val (link, future2) = protoWriteService.writeProto("", obj)
+        CompletableFuture.allOf(future1, future2).get()
         return FileIndexService.Entry.createEntry(prefix, name, link)
     }
 }

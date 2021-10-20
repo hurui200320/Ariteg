@@ -68,16 +68,14 @@ abstract class AbstractProtoServiceTest(
     }
 
     protected fun writeAndWait(inputStream: InputStream): AritegLink {
-        val (link, futureList) = inputStream.use {
+        val (link, future) = inputStream.use {
             protoService.writeChunk(
                 "", it,
                 defaultBlobSize, defaultListSize
             )
         }
         // wait all writing is finished
-        Assertions.assertDoesNotThrow {
-            CompletableFuture.allOf(*futureList.toTypedArray()).get()
-        }
+        Assertions.assertDoesNotThrow { future.get() }
         return link
     }
 
@@ -197,7 +195,7 @@ abstract class AbstractProtoServiceTest(
         Assertions.assertEquals(1, result.map { it.first }.distinct().size)
         // check every writing request success
         Assertions.assertDoesNotThrow {
-            CompletableFuture.allOf(*result.flatMap { it.second }.toTypedArray()).get()
+            CompletableFuture.allOf(*result.map { it.second }.toTypedArray()).get()
         }
         // extra 1 for additional list objects
         // link -> listObj -> (listObj, blobObj)

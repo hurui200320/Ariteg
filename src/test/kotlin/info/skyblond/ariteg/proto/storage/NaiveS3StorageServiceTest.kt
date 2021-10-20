@@ -15,11 +15,10 @@ internal class NaiveS3StorageServiceTest : AbstractProtoServiceTest() {
 
     override val storageService = NaiveS3StorageService(
         s3Client, "skyblond-ariteg-develop-test-202110",
-        Runtime.getRuntime().availableProcessors(),
         primaryProvider, secondaryProvider
     )
     override val metaService = InMemoryProtoMetaService()
-    override val protoService = object : ProtoWriteService(metaService, storageService, 5000) {}
+    override val protoService = object : ProtoWriteService(metaService, storageService, { 5000 }) {}
 
     override fun cleanUpAfterEachTest() {
         // stop s3
