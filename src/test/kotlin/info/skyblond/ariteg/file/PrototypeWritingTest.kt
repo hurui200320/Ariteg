@@ -36,7 +36,7 @@ class PrototypeWritingTest {
         val fileIndexService = InMemoryFileIndexService(protoMetaService)
         val fileWriteService = object : FileWriteService(
             fileIndexService, protoWriteService,
-            1 * 1024 * 1024 /* 1MB */, 176
+            16 * 1024 * 1024 /* 1MB */, 176
         ) {}
 
         val entry = fileWriteService.write(
