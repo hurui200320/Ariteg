@@ -1,6 +1,6 @@
 # Ariteg
 
-**This project has been fully moved to hurui200320/ArchiveDAG , which has all ideas implemented in this repo before [commit 85cb71c7488a866c42363fd8fd25d112a983ef7f](https://github.com/hurui200320/Ariteg/commit/85cb71c7488a866c42363fd8fd25d112a983ef7f), and has a Spring Boot based HTTP API. This repo is preserved for exploring new ideas since Kotlin is every easy to build prototype.**
+**This project has been fully moved to [hurui200320/ArchiveDAG](https://github.com/hurui200320/ArchiveDAG), which has all ideas implemented in this repo before [commit 85cb71c7488a866c42363fd8fd25d112a983ef7f](https://github.com/hurui200320/Ariteg/commit/85cb71c7488a866c42363fd8fd25d112a983ef7f), and has a Spring Boot based HTTP API. This repo is preserved for exploring new ideas since Kotlin is every easy to build prototype.**
 
 
 
