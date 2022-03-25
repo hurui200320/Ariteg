@@ -13,6 +13,8 @@ are needed to make them ready to read, then I might abandon this project and use
 IPFS Drive instead. But now (2021/10/14) I cannot find the source code and the 
 available documents are very limited, so I'll continue developing this for now.***
 
+***Use [restic](https://github.com/restic/restic) if you just want to store your file and dedup at chunk level. It support AWS S3.***
+
 ## Why Merkle DAG?
 
 If you know IPFS, then you might know they are using Merkle DAG to store data.
