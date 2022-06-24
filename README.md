@@ -1,17 +1,10 @@
 # Ariteg
 
-**This project has been fully moved to [hurui200320/ArchiveDAG](https://github.com/hurui200320/ArchiveDAG), which has all ideas implemented in this repo before [commit 85cb71c7488a866c42363fd8fd25d112a983ef7f](https://github.com/hurui200320/Ariteg/commit/85cb71c7488a866c42363fd8fd25d112a983ef7f), and has a Spring Boot based HTTP API. This repo is preserved for exploring new ideas since Kotlin is every easy to build prototype.**
+**This project has been restarted.**
 
 
 
-Archiving your data in a IPFS style (aka storing your data using Merkle DAG and
-archive them later).
-
-***Use IPFS Drive if you only want to store data using Merkle DAG.
-If the IPFS Drive can acknowledge the data it needed is archived and extra steps
-are needed to make them ready to read, then I might abandon this project and use
-IPFS Drive instead. But now (2021/10/14) I cannot find the source code and the 
-available documents are very limited, so I'll continue developing this for now.***
+Archiving your data using Merkle tree/dag, and store it with S3 deep archive layer.
 
 ***Use [restic](https://github.com/restic/restic) if you just want to store your file and dedup at chunk level. It support AWS S3.***
 
