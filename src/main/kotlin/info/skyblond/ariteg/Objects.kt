@@ -57,6 +57,23 @@ data class Link(
     enum class Type {
         BLOB, LIST, TREE
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Link) return false
+
+        if (hash != other.hash) return false
+        if (type != other.type) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = hash.hashCode()
+        result = 31 * result + type.hashCode()
+        return result
+    }
+
 }
 
 private val objectMapper = jacksonObjectMapper().also {
@@ -105,7 +122,7 @@ data class TreeObject(
 data class Entry(
     val name: String,
     val link: Link,
-    val lastModify: Date,
+    val time: Date,
     val note: String? = null
 ) {
     fun toJson(): String = objectMapper.writeValueAsString(this)
