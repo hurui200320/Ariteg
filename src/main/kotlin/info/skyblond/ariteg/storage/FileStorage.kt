@@ -2,12 +2,11 @@ package info.skyblond.ariteg.storage
 
 import info.skyblond.ariteg.*
 import mu.KotlinLogging
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.commons.io.FileUtils
 import java.io.File
 import java.util.*
 import java.util.concurrent.CompletableFuture
+
 
 class FileStorage(
     private val baseDir: File,
@@ -42,11 +41,9 @@ class FileStorage(
         val hash = obj.getHashString().get()
         val file = getFile(type.name, hash)
 
-            FileUtils.openOutputStream(file).use { fileOutputStream ->
-                BZip2CompressorOutputStream(fileOutputStream).use {
-                    it.write(getData(obj.encodeToBytes()))
-                }
-            }
+        FileUtils.openOutputStream(file).use {
+            it.write(getData(obj.encodeToBytes()))
+        }
 
         return Link(hash, type)
     }
@@ -65,11 +62,8 @@ class FileStorage(
 
     private fun internalRead(link: Link): ByteArray {
         val file = getFile(link.type.name, link.hash)
-
-        return FileUtils.openInputStream(file).use { fileInputStream ->
-            BZip2CompressorInputStream(fileInputStream).use {
-                parseData(it.readAllBytes())
-            }
+        return FileUtils.openInputStream(file).use {
+            parseData(it.readAllBytes())
         }
     }
 
@@ -106,6 +100,15 @@ class FileStorage(
     override fun deleteTree(link: Link): CompletableFuture<Void> = CompletableFuture.runAsync {
         internalDelete(link)
     }
+
+    override fun listObjects(): CompletableFuture<Triple<Set<String>, Set<String>, Set<String>>> =
+        CompletableFuture.supplyAsync {
+            val blobList = getFile("blob", "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
+            val listList = getFile("list", "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
+            val treeList = getFile("tree", "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
+
+            Triple(blobList.toSet(), listList.toSet(), treeList.toSet())
+        }
 
     override fun recover(links: Collection<Link>): CompletableFuture<Void> = CompletableFuture.runAsync {
         links.forEach {

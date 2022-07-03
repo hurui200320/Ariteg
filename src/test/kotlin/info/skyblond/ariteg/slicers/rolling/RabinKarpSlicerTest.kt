@@ -28,11 +28,7 @@ internal class RabinKarpSlicerTest {
         val blobs = RabinKarpSlicer(
             file, 0u, (1u shl 10) - 1u,
             64, 512, 48, 1821497u
-        ).map { future ->
-            future.get().also { it.file.deleteOnExit() }.readBlob()
-        }.map { it.get().data }.onEach { assertTrue(it.size <= 512) }
-
-        println(blobs.size)
+        ).map { it.data }.onEach { assertTrue(it.size <= 512) }
 
         assertArrayEquals(content, blobs.reduceRight { current, acc ->
             current + acc
@@ -55,7 +51,7 @@ internal class RabinKarpSlicerTest {
 
         while (iterator.hasNext()) {
             // eat blobs
-            iterator.next().get().file.deleteOnExit()
+            iterator.next()
         }
 
         assertThrows<NoSuchElementException> {

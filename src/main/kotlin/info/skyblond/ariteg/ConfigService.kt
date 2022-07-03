@@ -1,6 +1,7 @@
 package info.skyblond.ariteg
 
 import java.io.File
+import java.util.concurrent.Semaphore
 
 object ConfigService {
 
@@ -10,9 +11,19 @@ object ConfigService {
         return File("./data/blob-cache").also { it.mkdirs() }
     }
 
+    val uploadSemaphore = Semaphore(getUploadParallelLimit())
+
     // how much cached blobs are allowed during the slicing
-//    fun getSlicingCachedBlobLimit(): Int {
-//        // TODO
-//        return 2048
-//    }
+    fun getUploadParallelLimit(): Int {
+        // TODO
+        return 16
+    }
+
+
+    val preloadSemaphore = Semaphore(getPreloadParallelLimit())
+    fun getPreloadParallelLimit(): Int {
+        // TODO
+        return 1024
+    }
+
 }

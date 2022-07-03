@@ -13,13 +13,13 @@ import kotlin.test.assertTrue
 
 internal class FileStorageTest {
 
-    lateinit var baseDir: File
-    lateinit var fileStorage: FileStorage
+    private lateinit var baseDir: File
+    private lateinit var fileStorage: FileStorage
 
     @BeforeEach
     internal fun setUp() {
         baseDir = File(FileUtils.getTempDirectory(), Random.nextLong().toString())
-        fileStorage = FileStorage(baseDir)
+        fileStorage = FileStorage(baseDir, Random.nextBytes(32))
     }
 
     @AfterEach
@@ -128,4 +128,19 @@ internal class FileStorageTest {
         }
     }
 
+    @Test
+    fun testListObjects() {
+        val blobs = (0..30).map { fileStorage.writeBlob(Blob(Random.nextBytes(32))).get() }
+        val lists = (0..10).map { fileStorage.writeList(ListObject(listOf(blobs[it]))).get() }
+        val trees = (0..3).map { fileStorage.writeTree(TreeObject(listOf(lists[it].copy(name = "name")))).get() }
+
+        val (b, l, t) = fileStorage.listObjects().get()
+        assertEquals(blobs.size, b.size)
+        assertEquals(lists.size, l.size)
+        assertEquals(trees.size, t.size)
+
+        blobs.forEach { assertTrue { b.contains(it.hash) } }
+        lists.forEach { assertTrue { l.contains(it.hash) } }
+        trees.forEach { assertTrue { t.contains(it.hash) } }
+    }
 }

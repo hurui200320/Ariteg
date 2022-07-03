@@ -12,6 +12,11 @@ interface Storage : AutoCloseable {
 
     fun delete(link: Link): CompletableFuture<Void>
 
+    /**
+     * List all objects, return in "blobs, lists, trees" style, hashes.
+     * */
+    fun listObjects(): CompletableFuture<Triple<Set<String>, Set<String>, Set<String>>>
+
     fun resolve(rootLink: Link): CompletableFuture<Set<Link>>
 
     fun recover(links: Collection<Link>): CompletableFuture<Void>

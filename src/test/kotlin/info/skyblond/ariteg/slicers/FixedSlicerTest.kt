@@ -18,9 +18,7 @@ internal class FixedSlicerTest {
         file.deleteOnExit()
         FileUtils.writeByteArrayToFile(file, content)
 
-        val blobs = FixedSlicer(file, 126).map { future ->
-            future.get().also { it.file.deleteOnExit() }.readBlob()
-        }.map { it.get().data }
+        val blobs = FixedSlicer(file, 126).map { it.data }
 
         assertEquals(131, blobs.size)
         assertArrayEquals(content, blobs.reduceRight { current, acc ->
@@ -37,9 +35,8 @@ internal class FixedSlicerTest {
         file.deleteOnExit()
         FileUtils.writeByteArrayToFile(file, content)
 
-        val blobs = FixedSlicer(file, 128).map { future ->
-            future.get().also { it.file.deleteOnExit() }.readBlob()
-        }.map { it.get().data }.onEach { assertEquals(128, it.size) }
+        val blobs = FixedSlicer(file, 128).map { it.data }
+            .onEach { assertEquals(128, it.size) }
 
         assertEquals(128, blobs.size)
         assertArrayEquals(content, blobs.reduceRight { current, acc ->
@@ -59,7 +56,7 @@ internal class FixedSlicerTest {
 
         for (i in 1..128) {
             // eat blobs
-            slicer.next().get().file.deleteOnExit()
+            slicer.next()
         }
 
         assertThrows<NoSuchElementException> {
