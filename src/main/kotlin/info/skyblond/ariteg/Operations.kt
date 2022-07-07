@@ -96,26 +96,6 @@ object Operations {
     }
 
     /**
-     * Send the command which recover the blob links to accessible status.
-     * */
-    fun recover(links: Collection<Link>, storage: Storage) {
-        storage.recover(links).get()
-    }
-
-
-    /**
-     * Warm up the data by downloading/caching the data.
-     * */
-    fun preload(entry: Entry, storage: Storage) {
-        val links = resolve(entry, storage)
-        val semaphore = ConfigService.preloadSemaphore
-        links.map { link ->
-            semaphore.acquire()
-            storage.read(link).thenApply { semaphore.release(); it }
-        }.map { it.get() }
-    }
-
-    /**
      * Reconstruct the whole content according to the given [entry].
      * The blobs must be recovered first.
      * */

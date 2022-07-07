@@ -61,7 +61,7 @@ internal class FileStorageTest {
     }
 
     @Test
-    fun writeTree() {
+    fun testTree() {
         val tree = TreeObject(listOf(Link("something", Link.Type.BLOB, "name")))
         val link = fileStorage.write(Link.Type.TREE, tree).get()
         val treeR = fileStorage.read(link).get() as TreeObject
@@ -89,26 +89,6 @@ internal class FileStorageTest {
     }
 
     @Test
-    fun testRecover() {
-        val blobLinks = mutableListOf<Link>()
-        for (i in 1..3) {
-            blobLinks.add(fileStorage.writeBlob(Blob(Random.nextBytes(32))).get())
-        }
-        var link = fileStorage.write(Link.Type.LIST, ListObject(blobLinks)).get().copy(name = "name")
-        link = fileStorage.write(Link.Type.TREE, TreeObject(listOf(link))).get()
-
-        assertDoesNotThrow {
-            fileStorage.recover(setOf(link)).get()
-        }
-
-        assertThrows<ExecutionException> {
-            fileStorage.recover(setOf(Link("something", Link.Type.BLOB))).get()
-        }.also {
-            assertTrue { it.cause is IllegalStateException }
-        }
-    }
-
-    @Test
     fun testEntry() {
         val entry = Entry("name", Link("hash", Link.Type.BLOB), Date())
         fileStorage.addEntry(entry).get()
@@ -116,7 +96,12 @@ internal class FileStorageTest {
         assertEquals(1, fileStorage.listEntry().count())
 
         fileStorage.removeEntry(entry).get()
-        fileStorage.removeEntry(entry).get()
+
+        assertEquals(0, fileStorage.listEntry().count())
+
+        assertDoesNotThrow {
+            fileStorage.removeEntry(entry).get()
+        }
 
         File(baseDir, "entry").let {
             require(FileUtils.deleteQuietly(it))

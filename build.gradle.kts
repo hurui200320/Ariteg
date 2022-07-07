@@ -19,6 +19,9 @@ dependencies {
     implementation("commons-io:commons-io:2.11.0")
     implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
     implementation("ch.qos.logback:logback-classic:1.2.11")
+    implementation("com.github.ajalt.clikt:clikt:3.5.0")
+    implementation("io.minio:minio:8.4.2")
+
 
     testImplementation(kotlin("test"))
     testImplementation("org.mockito:mockito-core:4.6.1")

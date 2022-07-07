@@ -9,7 +9,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.File
-import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -68,7 +67,7 @@ internal class OperationsTest {
     private fun listFile(root: File): List<File> = if (root.isFile) {
         listOf(root)
     } else {
-        root.listFiles()!!.let { fs->
+        root.listFiles()!!.let { fs ->
             fs.filter { it.isFile } + fs.filter { it.isDirectory }.flatMap { listFile(it) }
         }
     }
@@ -102,7 +101,7 @@ internal class OperationsTest {
         // make sure unused things are deleted
         val root = prepareTestRootFolder()
         val entry = Operations.digest(root, slicerProvider, storage)
-        val (b,l,t) = storage.listObjects().get()
+        val (b, l, t) = storage.listObjects().get()
 
         val root2 = prepareTestRootFolder()
         val entry2 = Operations.digest(root2, slicerProvider, storage)
@@ -120,12 +119,12 @@ internal class OperationsTest {
 
         Operations.gc(storage)
 
-        val (b1,l1,t1) = storage.listObjects().get()
+        val (b1, l1, t1) = storage.listObjects().get()
         assertEquals(b, b1)
         assertEquals(l, l1)
         assertEquals(t, t1)
         assertDoesNotThrow {
-            Operations.preload(entry, storage)
+            Operations.resolve(entry, storage).forEach { storage.read(it) }
         }
 
     }

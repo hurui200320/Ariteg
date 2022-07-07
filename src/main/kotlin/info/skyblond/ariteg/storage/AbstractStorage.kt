@@ -5,6 +5,15 @@ import java.util.*
 import java.util.concurrent.CompletableFuture
 
 abstract class AbstractStorage : Storage {
+
+    protected abstract val key: ByteArray?
+
+    protected fun getData(data: ByteArray): ByteArray =
+        if (key != null) encrypt(key!!, data) else data
+
+    protected fun parseData(data: ByteArray): ByteArray =
+        if (key != null) decrypt(key!!, data) else data
+
     override fun write(type: Link.Type, obj: AritegObject): CompletableFuture<Link> = when (type) {
         Link.Type.BLOB -> writeBlob(obj as Blob)
         Link.Type.LIST -> writeList(obj as ListObject)
@@ -63,4 +72,7 @@ abstract class AbstractStorage : Storage {
 
         result
     }
+
+    protected fun base64Encode(name: String): String =
+        Base64.getUrlEncoder().encodeToString(name.encodeToByteArray())
 }

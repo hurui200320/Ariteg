@@ -19,8 +19,6 @@ interface Storage : AutoCloseable {
 
     fun resolve(rootLink: Link): CompletableFuture<Set<Link>>
 
-    fun recover(links: Collection<Link>): CompletableFuture<Void>
-
     fun addEntry(entry: Entry): CompletableFuture<Entry>
 
     fun removeEntry(entry: Entry): CompletableFuture<Void>

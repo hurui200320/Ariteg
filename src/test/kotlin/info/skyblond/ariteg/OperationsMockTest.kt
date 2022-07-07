@@ -27,13 +27,4 @@ class OperationsMockTest {
         Operations.resolve(Entry("name", link, Date()), storage)
         verify(storage, times(1)).resolve(link)
     }
-
-
-    @Test
-    fun recover() {
-        val links = listOf(Link("Something", Link.Type.BLOB))
-        `when`(storage.recover(links)).thenReturn(CompletableFuture.runAsync { })
-        Operations.recover(links, storage)
-        verify(storage, times(1)).recover(links)
-    }
 }

@@ -10,7 +10,7 @@ import java.util.concurrent.CompletableFuture
 
 class FileStorage(
     private val baseDir: File,
-    private val key: ByteArray? = null
+    override val key: ByteArray? = null
 ) : AbstractStorage() {
     private val logger = KotlinLogging.logger("FileStorage")
 
@@ -31,13 +31,7 @@ class FileStorage(
         return File(dir, name)
     }
 
-    private fun getData(data: ByteArray): ByteArray =
-        if (key != null) encrypt(key, data) else data
-
-    private fun parseData(data: ByteArray): ByteArray =
-        if (key != null) decrypt(key, data) else data
-
-    private fun internalWrite(type: Link.Type, obj: AritegObject): Link {
+    private fun internalWrite(type: Link.Type, obj: AritegObject): CompletableFuture<Link> = CompletableFuture.supplyAsync {
         val hash = obj.getHashString().get()
         val file = getFile(type.name, hash)
 
@@ -45,20 +39,14 @@ class FileStorage(
             it.write(getData(obj.encodeToBytes()))
         }
 
-        return Link(hash, type)
+        Link(hash, type)
     }
 
-    override fun writeBlob(blob: Blob): CompletableFuture<Link> = CompletableFuture.supplyAsync {
-        internalWrite(Link.Type.BLOB, blob)
-    }
+    override fun writeBlob(blob: Blob): CompletableFuture<Link> = internalWrite(Link.Type.BLOB, blob)
 
-    override fun writeList(listObj: ListObject): CompletableFuture<Link> = CompletableFuture.supplyAsync {
-        internalWrite(Link.Type.LIST, listObj)
-    }
+    override fun writeList(listObj: ListObject): CompletableFuture<Link> = internalWrite(Link.Type.LIST, listObj)
 
-    override fun writeTree(treeObj: TreeObject): CompletableFuture<Link> = CompletableFuture.supplyAsync {
-        internalWrite(Link.Type.TREE, treeObj)
-    }
+    override fun writeTree(treeObj: TreeObject): CompletableFuture<Link> = internalWrite(Link.Type.TREE, treeObj)
 
     private fun internalRead(link: Link): ByteArray {
         val file = getFile(link.type.name, link.hash)
@@ -69,17 +57,17 @@ class FileStorage(
 
     override fun readBlob(link: Link): CompletableFuture<Blob> = CompletableFuture.supplyAsync {
         val data = internalRead(link)
-        Blob(data)
+        Blob(data).also { it.verify(link.hash) }
     }
 
     override fun readList(link: Link): CompletableFuture<ListObject> = CompletableFuture.supplyAsync {
         val json = internalRead(link).decodeToString()
-        ListObject.fromJson(json)
+        ListObject.fromJson(json).also { it.verify(link.hash) }
     }
 
     override fun readTree(link: Link): CompletableFuture<TreeObject> = CompletableFuture.supplyAsync {
         val json = internalRead(link).decodeToString()
-        TreeObject.fromJson(json)
+        TreeObject.fromJson(json).also { it.verify(link.hash) }
     }
 
     private fun internalDelete(link: Link) {
@@ -103,26 +91,17 @@ class FileStorage(
 
     override fun listObjects(): CompletableFuture<Triple<Set<String>, Set<String>, Set<String>>> =
         CompletableFuture.supplyAsync {
-            val blobList = getFile("blob", "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
-            val listList = getFile("list", "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
-            val treeList = getFile("tree", "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
+            val blobList = getFile(Link.Type.BLOB.name, "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
+            val listList = getFile(Link.Type.LIST.name, "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
+            val treeList = getFile(Link.Type.TREE.name, "something").parentFile.listFiles()?.map { it.name } ?: emptyList()
 
             Triple(blobList.toSet(), listList.toSet(), treeList.toSet())
         }
 
-    override fun recover(links: Collection<Link>): CompletableFuture<Void> = CompletableFuture.runAsync {
-        links.forEach {
-            val file = getFile(it.type.name, it.hash)
-            check(file.exists()) { "File ${file.canonicalPath} is not exists" }
-        }
-    }
-
-    private fun base64Encode(name: String): String =
-        Base64.getUrlEncoder().encodeToString(name.encodeToByteArray())
-
     override fun addEntry(entry: Entry): CompletableFuture<Entry> = CompletableFuture.supplyAsync {
         val file = getFile("entry", base64Encode(entry.name))
-        FileUtils.write(file, entry.toJson(), Charsets.UTF_8)
+        val data = getData(entry.toJson().encodeToByteArray())
+        FileUtils.writeByteArrayToFile(file, data)
         entry
     }
 
@@ -147,7 +126,7 @@ class FileStorage(
 
                     override fun next(): Entry {
                         if (!hasNext()) throw NoSuchElementException("No next elements")
-                        val json = FileUtils.readFileToString(listOfFile[pointer++], Charsets.UTF_8)
+                        val json = parseData(FileUtils.readFileToByteArray(listOfFile[pointer++])).decodeToString()
                         return Entry.fromJson(json)
                     }
                 }
