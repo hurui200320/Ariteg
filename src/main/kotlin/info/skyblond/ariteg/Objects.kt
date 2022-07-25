@@ -8,14 +8,21 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import java.util.*
 import java.util.concurrent.CompletableFuture
+import kotlin.math.absoluteValue
 
 interface AritegObject {
     @JsonIgnore
     fun getHashString(): CompletableFuture<String>
 
-    fun verify(hash: String): CompletableFuture<Boolean> = CompletableFuture.supplyAsync {
-        val realHash = getHashString()
-        realHash.get() == hash
+    class HashNotMatchException(
+        expected: String, real: String,
+    ) : RuntimeException("expected hash: $expected, got: $real")
+
+    fun verify(hash: String) {
+        val realHash = getHashString().get()
+        if (realHash != hash) {
+            throw HashNotMatchException(hash, realHash)
+        }
     }
 
     fun encodeToBytes(): ByteArray
@@ -118,14 +125,15 @@ data class TreeObject(
     override fun getHashString(): CompletableFuture<String> = calculateHash(toString().encodeToByteArray())
 }
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
 data class Entry(
     val name: String,
     val link: Link,
     val time: Date,
-    val note: String? = null
+    val note: String = "",
+    val id: String = "${System.currentTimeMillis()}-${kotlin.random.Random.nextLong().absoluteValue}"
 ) {
-    fun toJson(): String = objectMapper.writeValueAsString(this)
+    fun toJson(): String = objectMapper.writerWithDefaultPrettyPrinter()
+        .writeValueAsString(this)
 
     companion object {
         fun fromJson(json: String): Entry = objectMapper.readValue(json)

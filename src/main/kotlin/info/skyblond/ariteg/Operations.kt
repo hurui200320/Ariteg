@@ -1,48 +1,79 @@
 package info.skyblond.ariteg
 
-import info.skyblond.ariteg.slicers.Slicer
+import info.skyblond.ariteg.slicers.SlicerProvider
 import info.skyblond.ariteg.storage.Storage
 import mu.KotlinLogging
 import org.apache.commons.io.FileUtils
+import java.io.Closeable
 import java.io.File
 import java.util.*
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Semaphore
+import kotlin.math.ceil
+import kotlin.math.max
 import kotlin.math.min
 
 object Operations {
     private val logger = KotlinLogging.logger("Operations")
+    private const val MEGA_BYTE = 1024 * 1024
+    private fun format(number: Double): String {
+        return "%.2f".format(number)
+    }
+
+    fun getLimitingSemaphore(): Semaphore =
+        Semaphore(Runtime.getRuntime().availableProcessors() * 2)
 
     /**
      * Digest the [root] file, slice it and save as an [Entry]
      * */
-    fun digest(root: File, slicerProvider: (File) -> Slicer, storage: Storage): Entry {
+    fun digest(root: File, slicerProvider: SlicerProvider, storage: Storage): Entry {
         val rootLink = internalDigest(root, slicerProvider, storage)
         val entry = Entry(root.name, rootLink.get(), Date(), "")
+        logger.info { "Writing entry for ${root.canonicalPath}" }
         return storage.addEntry(entry).get()
     }
 
     private fun internalDigest(
         file: File,
-        slicerProvider: (File) -> Slicer,
+        slicerProvider: SlicerProvider,
         storage: Storage
     ): CompletableFuture<Link> =
         when {
             file.isFile -> CompletableFuture.supplyAsync {
-                val slicer = slicerProvider.invoke(file).iterator()
+                val slicer = slicerProvider.invoke(file)
+                val totalSize = file.length().toDouble()
+                val blobIterator = slicer.iterator()
                 // use semaphore to limit memory usage
                 // aka how many pending blobs in memory
-                val semaphore = ConfigService.uploadSemaphore
+                val semaphore = getLimitingSemaphore()
+                logger.info { "Slicing chunks: ${file.canonicalPath}" }
                 val futureLinks = LinkedList<CompletableFuture<Link>>()
+                var processedSize = 0L
+                var lastTime = 0L
                 // slice and store blobs
-                while (slicer.hasNext()) {
+                while (blobIterator.hasNext()) {
                     semaphore.acquire()
-                    val nextBlob = slicer.next()
+                    val nextBlob = blobIterator.next()
+                    processedSize += nextBlob.data.size
                     futureLinks.add(
                         storage.write(Link.Type.BLOB, nextBlob)
+                            .exceptionally { semaphore.release(); logger.error(it) { "Error when writing" }; throw it }
                             .thenApply { semaphore.release(); it }
                     )
+                    // print processing info
+                    if (System.currentTimeMillis() - lastTime >= 1000) {
+                        logger.info { "[${format(processedSize * 100.0 / totalSize)}%]" +
+                                "Processed ${format(processedSize / MEGA_BYTE.toDouble())}MB " +
+                                "of ${format(totalSize / MEGA_BYTE)}MB (${file.canonicalPath})" }
+                        lastTime = System.currentTimeMillis()
+                    }
                 }
 
+                if (blobIterator is AutoCloseable) {
+                    blobIterator.close()
+                }
+
+                logger.info { "Reconstructing structural info: ${file.canonicalPath}" }
                 // make links into ListObjects
                 var i = 0
                 val listLength = 128
@@ -56,6 +87,7 @@ object Operations {
                     // make it a list
                     val listObject = ListObject(list.map { it.get() })
                     val receipt = storage.write(Link.Type.LIST, listObject)
+                    logger.info { "Reconstructing ${file.canonicalPath}: ${futureLinks.size} left" }
                     // update i (next fetch point at next iter)
                     futureLinks.add(i++, receipt)
                     // reset i if remained links are not enough for a new list
@@ -68,18 +100,19 @@ object Operations {
                 if (futureLinks.size == 0) {
                     futureLinks.add(storage.write(Link.Type.BLOB, Blob(ByteArray(0))))
                 }
-
+                logger.info { "Finish uploading ${file.canonicalPath}" }
                 // The last one should be the root
                 futureLinks[0].get().copy(name = file.name)
             }
             file.isDirectory -> CompletableFuture.supplyAsync {
                 val files = file.listFiles() ?: error("List folder returns null")
-                val futureLinks = files.map { f ->
+                val subLinks = files.map { f ->
+                    // sync op here, the internal digest of file is already async
                     internalDigest(f, slicerProvider, storage).thenApply {
                         it.copy(name = f.name)
-                    }
+                    }.get()
                 }
-                TreeObject(futureLinks.map { it.get() }).let {
+                TreeObject(subLinks).let {
                     storage.write(Link.Type.TREE, it).get().copy(name = file.name)
                 }
             }
@@ -172,18 +205,25 @@ object Operations {
     fun gc(storage: Storage) {
         val listObjectsFuture = storage.listObjects()
         val workingQueue = LinkedList<Link>()
+        logger.info { "Listing entries..." }
         workingQueue.addAll(storage.listEntry().map { it.link })
+        logger.info { "Listed ${workingQueue.size} entries" }
         val waitingQueue = LinkedList<CompletableFuture<out AritegObject>>()
+        logger.info { "Listing current objects..." }
         // get all objects and remove reachable objects
         val (blobs, lists, trees) = listObjectsFuture.get()
             .let { Triple(it.first.toMutableSet(), it.second.toMutableSet(), it.third.toMutableSet()) }
+        logger.info { "Listed ${blobs.size} blobs, ${lists.size} lists, and ${trees.size} trees" }
         while (workingQueue.isNotEmpty()) {
             val link = workingQueue.poll()!!
             when (link.type) {
-                Link.Type.BLOB -> blobs.remove(link.hash)
+                Link.Type.BLOB -> {
+                    blobs.remove(link.hash)
+                }
                 Link.Type.LIST -> {
                     if (lists.contains(link.hash)) {
                         // the sub links are not visited yet
+                        // submit the job and waiting
                         waitingQueue.add(storage.read(link))
                         lists.remove(link.hash)
                     } // otherwise, the link and its sub links are visited
@@ -197,6 +237,9 @@ object Operations {
             }
 
             if (workingQueue.isEmpty()) {
+                // get result from waiting queue and put into working queue
+                logger.info { "${blobs.size} blobs remain, ${lists.size} lists remain, ${trees.size} trees remain" }
+                logger.info { "${waitingQueue.size} objects are fetching..." }
                 waitingQueue.forEach {
                     when (val obj = it.get()) {
                         is ListObject -> workingQueue.addAll(obj.content)
@@ -204,8 +247,10 @@ object Operations {
                     }
                 }
                 waitingQueue.clear()
+                logger.info { "Checking ${workingQueue.size} objects..." }
             }
         }
+        logger.info { "Found ${blobs.size} unreachable blobs, ${lists.size} unreachable lists, and ${trees.size} unreachable trees" }
         // now what we left are unreachable objects
         val deletingQueue = LinkedList<CompletableFuture<Void>>()
         blobs.forEach { deletingQueue.add(storage.delete(Link(it, Link.Type.BLOB))) }
@@ -213,4 +258,38 @@ object Operations {
         trees.forEach { deletingQueue.add(storage.delete(Link(it, Link.Type.TREE))) }
         deletingQueue.forEach { it.get() }
     }
+
+    fun integrityCheck(storage: Storage) {
+        val listObjectsFuture = storage.listObjects()
+        logger.info { "Listing current objects..." }
+        // get all objects and remove reachable objects
+        val blobs = listObjectsFuture.get().first
+        logger.info { "Listed ${blobs.size} blobs" }
+        val semaphore = getLimitingSemaphore()
+        val brokenList = blobs.mapIndexed { index, hash ->
+            val link = Link(hash, Link.Type.BLOB)
+            semaphore.acquire()
+            if (index % 100 == 0) {
+                logger.info { "Checking ${index / 1000.0}K blobs" }
+            }
+            storage.read(link)
+                .thenApply { semaphore.release(); null as Link? }
+                .exceptionally {
+                    semaphore.release()
+                    if (it is AritegObject.HashNotMatchException) {
+                        // exception means the hash is not correct
+                        logger.info { "Hash not match on ${link.hash}, deleting..." }
+                        link
+                    } else {
+                        throw it
+                    }
+                }
+        }.mapNotNull { it.get() }
+        logger.info { "Found ${brokenList.size} broken blobs, deleting..." }
+        brokenList
+            .map { storage.delete(it) }
+            .forEach { it.get() }
+
+    }
 }
+

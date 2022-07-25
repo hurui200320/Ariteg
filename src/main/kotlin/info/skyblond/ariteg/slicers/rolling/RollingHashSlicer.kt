@@ -14,7 +14,7 @@ abstract class RollingHashSlicer(
     private val minChunkSize: Int,
     private val maxChunkSize: Int,
     private val windowSize: Int,
-    private val channelBufferSize: Int = 32 * 1024 * 1024
+    private val channelBufferSize: Int
 ) : Slicer {
 
     init {
@@ -57,13 +57,14 @@ abstract class RollingHashSlicer(
         private fun readNextWindowByte(): UInt? {
             if (this.channelBufferPos >= this.channelBufferMax) {
                 // read new data
+                channelBuffer.clear()
                 this.channelBufferMax = this.fileChannel.read(this.channelBuffer)
                 this.channelBuffer.flip()
                 this.channelBufferPos = 0
             }
             // after reload, the pos==max
             // means this is really the end
-            if (channelBufferPos == channelBufferMax) {
+            if (channelBufferPos >= channelBufferMax) {
                 return null
             }
             this.channelBufferPos++

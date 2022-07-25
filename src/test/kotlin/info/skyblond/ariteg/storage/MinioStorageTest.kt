@@ -43,7 +43,6 @@ internal class MinioStorageTest {
                     .recursive(true)
                     .build()
             ).map { it.get().objectName() }
-            println(objs)
             if (objs.isEmpty()) {
                 break
             }
@@ -116,9 +115,9 @@ internal class MinioStorageTest {
 
     @Test
     fun listObjects() {
-        val blobs = (0..10).map { minioStorage.writeBlob(Blob(Random.nextBytes(32))).get() }
-        val lists = (0..7).map { minioStorage.writeList(ListObject(listOf(blobs[it]))).get() }
-        val trees = (0..3).map { minioStorage.writeTree(TreeObject(listOf(lists[it].copy(name = "name")))).get() }
+        val blobs = (0..10).map { minioStorage.write(Link.Type.BLOB, Blob(Random.nextBytes(32))).get() }
+        val lists = (0..7).map { minioStorage.write(Link.Type.LIST,  ListObject(listOf(blobs[it]))).get() }
+        val trees = (0..3).map { minioStorage.write(Link.Type.TREE,   TreeObject(listOf(lists[it].copy(name = "name")))).get() }
 
         val (b, l, t) = minioStorage.listObjects().get()
         assertEquals(blobs.size, b.size)

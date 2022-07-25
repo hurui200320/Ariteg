@@ -4,47 +4,106 @@ import info.skyblond.ariteg.*
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
-abstract class AbstractStorage : Storage {
+abstract class AbstractStorage<PathType> : Storage {
 
     protected abstract val key: ByteArray?
 
-    protected fun getData(data: ByteArray): ByteArray =
-        if (key != null) encrypt(key!!, data) else data
+    /**
+     * Map the link (represented by the [type] and [name]) to a path.
+     * The path can be [java.io.File], [String], or something else.
+     * */
+    protected abstract fun mapToPath(type: String, name: String): PathType
 
-    protected fun parseData(data: ByteArray): ByteArray =
-        if (key != null) decrypt(key!!, data) else data
+    /**
+     * Get parent path from the given [path].
+     * */
+    protected abstract fun getParentPath(path: PathType): PathType
 
-    override fun write(type: Link.Type, obj: AritegObject): CompletableFuture<Link> = when (type) {
-        Link.Type.BLOB -> writeBlob(obj as Blob)
-        Link.Type.LIST -> writeList(obj as ListObject)
-        Link.Type.TREE -> writeTree(obj as TreeObject)
-    }
+    protected class ObjectAlreadyExistsException : RuntimeException()
 
-    abstract fun writeBlob(blob: Blob): CompletableFuture<Link>
-    abstract fun writeList(listObj: ListObject): CompletableFuture<Link>
-    abstract fun writeTree(treeObj: TreeObject): CompletableFuture<Link>
+    /**
+     * Write the given data into storage.
+     * If the object exists(the path has been used),
+     * throw [ObjectAlreadyExistsException]
+     * */
+    protected abstract fun internalWrite(path: PathType, data: ByteArray)
 
-    override fun read(link: Link): CompletableFuture<out AritegObject> = when (link.type) {
-        Link.Type.BLOB -> readBlob(link)
-        Link.Type.LIST -> readList(link)
-        Link.Type.TREE -> readTree(link)
-    }
+    /**
+     * Read raw data from storage and return.
+     * */
+    protected abstract fun internalRead(path: PathType): ByteArray
 
-    abstract fun readBlob(link: Link): CompletableFuture<Blob>
-    abstract fun readList(link: Link): CompletableFuture<ListObject>
-    abstract fun readTree(link: Link): CompletableFuture<TreeObject>
+    /**
+     * Delete the link quietly
+     * */
+    protected abstract fun internalDelete(path: PathType)
 
-    override fun delete(link: Link): CompletableFuture<Void> = when (link.type) {
-        Link.Type.BLOB -> deleteBlob(link)
-        Link.Type.LIST -> deleteList(link)
-        Link.Type.TREE -> deleteTree(link)
-    }
+    /**
+     * Get all object's path who is setting in the [parentPath].
+     * Aka, list all sub files in a father file; or list all sub keys
+     * in a prefix.
+     * */
+    protected abstract fun listPathInPath(parentPath: PathType): List<PathType>
 
-    abstract fun deleteBlob(link: Link): CompletableFuture<Void>
-    abstract fun deleteList(link: Link): CompletableFuture<Void>
-    abstract fun deleteTree(link: Link): CompletableFuture<Void>
+    /**
+     * Unlike [listPathInPath], [listHashInPath] do not list path,
+     * but object hash (or entry id).
+     * */
+    protected abstract fun listHashInPath(parentPath: PathType): Set<String>
 
-    override fun resolve(rootLink: Link): CompletableFuture<Set<Link>> = CompletableFuture.supplyAsync {
+
+    private fun getData(data: ByteArray): ByteArray = if (key != null) encrypt(key!!, data) else data
+
+    private fun parseData(data: ByteArray): ByteArray = if (key != null) decrypt(key!!, data) else data
+
+
+    final override fun write(type: Link.Type, obj: AritegObject): CompletableFuture<Link> =
+        CompletableFuture.supplyAsync {
+            val hash = obj.getHashString().get()
+            val path = mapToPath(type.name, hash)
+            val rawData = obj.encodeToBytes()
+
+            try {
+                internalWrite(path, getData(rawData))
+            } catch (e: ObjectAlreadyExistsException) {
+                // proto exists, read and check content
+                val content = parseData(internalRead(path))
+                check(rawData.contentEquals(content)) {
+                    "Hash collision detected on $hash (Or wrong password)"
+                }
+            }
+
+            Link(hash, type)
+        }
+
+
+    final override fun read(link: Link): CompletableFuture<out AritegObject> =
+        CompletableFuture.supplyAsync {
+            val path = mapToPath(link.type.name, link.hash)
+            when (link.type) {
+                Link.Type.BLOB -> {
+                    val data = parseData(internalRead(path))
+                    Blob(data).also { it.verify(link.hash) }
+                }
+                Link.Type.LIST -> {
+                    val json = parseData(internalRead(path)).decodeToString()
+                    ListObject.fromJson(json).also { it.verify(link.hash) }
+
+                }
+                Link.Type.TREE -> {
+                    val json = parseData(internalRead(path)).decodeToString()
+                    TreeObject.fromJson(json).also { it.verify(link.hash) }
+                }
+            }
+        }
+
+    final override fun delete(link: Link): CompletableFuture<Void> =
+        CompletableFuture.runAsync {
+            val path = mapToPath(link.type.name, link.hash)
+            internalDelete(path)
+        }
+
+    final override fun resolve(rootLink: Link): CompletableFuture<Set<Link>> = CompletableFuture.supplyAsync {
         val queue = LinkedList(listOf(rootLink))
         val result = HashSet<Link>()
         val futureList = LinkedList<CompletableFuture<out AritegObject>>()
@@ -73,6 +132,44 @@ abstract class AbstractStorage : Storage {
         result
     }
 
-    protected fun base64Encode(name: String): String =
-        Base64.getUrlEncoder().encodeToString(name.encodeToByteArray())
+
+    final override fun listObjects(): CompletableFuture<Triple<Set<String>, Set<String>, Set<String>>> =
+        CompletableFuture.supplyAsync {
+            val blobSet = listHashInPath(getParentPath(mapToPath(Link.Type.BLOB.name, "something")))
+            val listSet = listHashInPath(getParentPath(mapToPath(Link.Type.LIST.name, "something")))
+            val treeSet = listHashInPath(getParentPath(mapToPath(Link.Type.TREE.name, "something")))
+            Triple(blobSet, listSet, treeSet)
+        }
+
+    final override fun addEntry(entry: Entry): CompletableFuture<Entry> = CompletableFuture.supplyAsync {
+        val path = mapToPath("entry", entry.id)
+        val data = entry.toJson().encodeToByteArray()
+        internalWrite(path, data)
+        entry
+    }
+
+    final override fun removeEntry(entry: Entry): CompletableFuture<Void> = CompletableFuture.runAsync {
+        val path = mapToPath("entry", entry.id)
+        internalDelete(path)
+    }
+
+    final override fun listEntry(): Iterable<Entry> {
+        val parentPath = getParentPath(mapToPath("entry", "something"))
+        val listOfPath = listPathInPath(parentPath)
+        return object : Iterable<Entry> {
+            override fun iterator(): Iterator<Entry> {
+                return object : Iterator<Entry> {
+                    private var pointer = 0
+
+                    override fun hasNext(): Boolean = pointer < listOfPath.size
+
+                    override fun next(): Entry {
+                        if (!hasNext()) throw NoSuchElementException("No next elements")
+                        val json = internalRead(listOfPath[pointer++]).decodeToString()
+                        return Entry.fromJson(json)
+                    }
+                }
+            }
+        }
+    }
 }

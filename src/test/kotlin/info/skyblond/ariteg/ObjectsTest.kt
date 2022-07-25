@@ -16,7 +16,7 @@ internal class ObjectsTest {
 
         aritegObjects.forEach {
             val hash = it.getHashString().get()
-            assertTrue(it.verify(hash).get())
+            assertDoesNotThrow { it.verify(hash) }
         }
     }
 
@@ -63,11 +63,11 @@ internal class ObjectsTest {
         val treeObjDes = TreeObject.fromJson(treeObjJson)
         assertEquals(treeObj, treeObjDes)
 
-        val entry = Entry("文件名", Link("hash", Link.Type.BLOB), Date(1656040508353), "note")
+        val entry = Entry("文件名", Link("hash", Link.Type.BLOB), Date(1656040508353), "note", "id")
         val entryJson = entry.toJson()
         assertEquals(
-            "{\"name\":\"文件名\",\"link\":{\"hash\":\"hash\",\"type\":\"BLOB\"},\"time\":\"2022-06-24T03:15:08.353+00:00\",\"note\":\"note\"}",
-            entryJson
+            "{  \"name\" : \"文件名\",  \"link\" : {    \"hash\" : \"hash\",    \"type\" : \"BLOB\"  },  \"time\" : \"2022-06-24T03:15:08.353+00:00\",  \"note\" : \"note\",  \"id\" : \"id\"}",
+            entryJson.replace("\r\n", "")
         )
         val entryDes = Entry.fromJson(entryJson)
         assertEquals(entry, entryDes)

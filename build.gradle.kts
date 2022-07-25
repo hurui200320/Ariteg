@@ -13,14 +13,19 @@ repositories {
 }
 
 dependencies {
+    // crypto operations
     implementation("org.bouncycastle:bcprov-jdk18on:1.71")
+    // multihash
     implementation("com.github.multiformats:java-multihash:v1.3.0")
+    // json & yaml operation
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.3")
+    // commons-io
     implementation("commons-io:commons-io:2.11.0")
+    // kotlin logging
     implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
     implementation("ch.qos.logback:logback-classic:1.2.11")
-    implementation("com.github.ajalt.clikt:clikt:3.5.0")
-    implementation("io.minio:minio:8.4.2")
+    // minio sdk
+    implementation("io.minio:minio:8.4.3")
 
 
     testImplementation(kotlin("test"))

@@ -35,7 +35,7 @@ private val secureRandom = SecureRandom()
  * Key: 256bits -> 32bytes
  * Using AES-256-GCM-SIV, max size: 2^31 - 24 bytes
  * */
-fun encrypt(key:ByteArray, plainData: ByteArray): ByteArray {
+fun encrypt(key: ByteArray, plainData: ByteArray): ByteArray {
     val cipher = GCMSIVBlockCipher(AESEngine())
     // nonce can be any size, but must not be reused
     // the SIV will have more security when nonce is reused
