@@ -127,8 +127,4 @@ class MinioStorage(
         }
         return paths
     }
-
-    override fun close() {
-        // nop
-    }
 }

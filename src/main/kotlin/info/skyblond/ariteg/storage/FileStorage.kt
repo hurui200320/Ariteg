@@ -59,8 +59,4 @@ class FileStorage(
         return parentPath.listFiles()?.filter { it.isFile }
             ?: error("Failed to list entries: invalid dir: ${parentPath.canonicalPath}")
     }
-
-    override fun close() {
-        // nop
-    }
 }

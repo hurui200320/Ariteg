@@ -1,4 +1,4 @@
-package info.skyblond.ariteg.run.utils
+package info.skyblond.ariteg.cmd
 
 import info.skyblond.ariteg.slicers.FixedSlicer
 import info.skyblond.ariteg.slicers.SlicerProvider

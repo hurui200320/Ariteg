@@ -9,6 +9,14 @@ abstract class AbstractStorage<PathType> : Storage {
     protected abstract val key: ByteArray?
 
     /**
+     * In case multiple thread write the same file at the same time,
+     * this set records all writing paths. When writing, first claim
+     * in this set, after write, remove the entry from this set.
+     * Check this set before writing, wait until the entry is removed.
+     * */
+    private val writingPathSet = HashSet<PathType>()
+
+    /**
      * Map the link (represented by the [type] and [name]) to a path.
      * The path can be [java.io.File], [String], or something else.
      * */
@@ -63,6 +71,27 @@ abstract class AbstractStorage<PathType> : Storage {
             val path = mapToPath(type.name, hash)
             val rawData = obj.encodeToBytes()
 
+            // make sure only one thread write into one file
+            while (true) {
+                var exitFlag = false
+                synchronized(writingPathSet) {
+                    // no on is writing, then we write
+                    if (!writingPathSet.contains(path)) {
+                        writingPathSet.add(path)
+                        exitFlag = true
+                    }
+                    // otherwise, return the lock and waiting
+                }
+                if (exitFlag) {
+                    break
+                } else {
+                    try {
+                        Thread.sleep(1000)
+                    } catch (_: Throwable) {
+                    }
+                }
+            }
+
             try {
                 internalWrite(path, getData(rawData))
             } catch (e: ObjectAlreadyExistsException) {
@@ -71,6 +100,10 @@ abstract class AbstractStorage<PathType> : Storage {
                 check(rawData.contentEquals(content)) {
                     "Hash collision detected on $hash (Or wrong password)"
                 }
+            }
+
+            synchronized(writingPathSet) {
+                writingPathSet.remove(path)
             }
 
             Link(hash, type)
@@ -171,5 +204,9 @@ abstract class AbstractStorage<PathType> : Storage {
                 }
             }
         }
+    }
+
+    override fun close() {
+        // nop
     }
 }

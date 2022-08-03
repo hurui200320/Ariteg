@@ -2,10 +2,15 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.7.0"
+    application
 }
 
 group = "info.skyblond.ariteg"
 version = "1.0-SNAPSHOT"
+
+application {
+    mainClass.set("info.skyblond.ariteg.cmd.MainCommandKt")
+}
 
 repositories {
     mavenCentral()
@@ -26,6 +31,9 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.2.11")
     // minio sdk
     implementation("io.minio:minio:8.4.3")
+    // clikt
+    implementation("com.github.ajalt.clikt:clikt:3.5.0")
+
 
 
     testImplementation(kotlin("test"))

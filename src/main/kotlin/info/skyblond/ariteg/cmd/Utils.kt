@@ -1,4 +1,4 @@
-package info.skyblond.ariteg.run.utils
+package info.skyblond.ariteg.cmd
 
 import info.skyblond.ariteg.Entry
 
@@ -9,3 +9,4 @@ fun Entry.printDetails() {
     println("\tNote: ${this.note}")
     println("\tTime: ${this.time}")
 }
+

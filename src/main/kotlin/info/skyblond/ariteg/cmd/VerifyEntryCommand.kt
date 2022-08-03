@@ -1,13 +1,28 @@
-package info.skyblond.ariteg.run
+package info.skyblond.ariteg.cmd
 
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.multiple
 import info.skyblond.ariteg.Operations
-import info.skyblond.ariteg.run.utils.useStorageSafe
+import mu.KotlinLogging
 import java.util.concurrent.CompletableFuture
 
-fun main() {
-    useStorageSafe { logger, storage ->
+class VerifyEntryCommand : CliktCommand(
+    name = "verify",
+    help = "Make sure the given entry is readable"
+) {
+    private val ids: List<String> by argument(
+        name = "ID", help = "Entry ids. Empty means check all entries"
+    ).multiple()
+    private val logger = KotlinLogging.logger("Verify")
+
+    override fun run() {
+        val storage = Global.getStorage()
         logger.info { "Listing entries..." }
         Operations.listEntry(storage).forEach { entry ->
+            if (ids.isNotEmpty() && entry.id !in ids) {
+                return@forEach
+            }
             logger.info { "Verifying entry: ${entry.id} (${entry.name})" }
             val blobs = Operations.resolve(entry, storage)
             logger.info { "Verifying ${blobs.size / 1000.0}K blobs..." }
@@ -20,8 +35,8 @@ fun main() {
                     .thenRun { semaphore.release() }
             }.forEachIndexed { index, completableFuture ->
                 completableFuture.get()
-                if (index % 100 == 0) {
-                    logger.info { "${index / 1000.0}K blobs are checked" }
+                if (index % 1000 == 0) {
+                    logger.info { "${index / 1000}K blobs are checked" }
                 }
             }
         }
