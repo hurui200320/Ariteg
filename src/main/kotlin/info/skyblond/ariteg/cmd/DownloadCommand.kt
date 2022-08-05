@@ -3,7 +3,6 @@ package info.skyblond.ariteg.cmd
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.types.file
-import info.skyblond.ariteg.Operations
 import mu.KotlinLogging
 import java.io.File
 
@@ -18,16 +17,10 @@ class DownloadCommand : CliktCommand(
             canBeFile = false,
             canBeDir = true
         )
-    private val logger = KotlinLogging.logger("Upload")
 
-    override fun run() {
-        val storage = Global.getStorage()
-        logger.info { "Finding entry..." }
-        val entry = Operations.listEntry(storage)
-            .find { it.id == id } ?: error("Entry not found")
-        logger.info { "Start downloading..." }
-        Operations.restore(entry, storage, file)
-
-        logger.info { "Done" }
+    init {
+        CmdContext.setLogger(KotlinLogging.logger("Upload"))
     }
+
+    override fun run() = CmdContext.download(id, file)
 }

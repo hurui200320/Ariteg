@@ -10,6 +10,7 @@ version = "1.0-SNAPSHOT"
 
 application {
     mainClass.set("info.skyblond.ariteg.cmd.MainCommandKt")
+    executableDir = ""
 }
 
 repositories {
@@ -33,7 +34,8 @@ dependencies {
     implementation("io.minio:minio:8.4.3")
     // clikt
     implementation("com.github.ajalt.clikt:clikt:3.5.0")
-
+    // Mozilla Rhino, running js on JVM
+    implementation("org.mozilla:rhino:1.7.14")
 
 
     testImplementation(kotlin("test"))

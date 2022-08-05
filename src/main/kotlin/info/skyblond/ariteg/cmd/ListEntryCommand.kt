@@ -1,15 +1,15 @@
 package info.skyblond.ariteg.cmd
 
 import com.github.ajalt.clikt.core.CliktCommand
-import info.skyblond.ariteg.Operations
+import mu.KotlinLogging
 
 class ListEntryCommand : CliktCommand(
-    name = "list",
+    name = "ls",
     help = "List all entries in the given storage"
 ) {
-    override fun run() {
-        val storage = Global.getStorage()
-        Operations.listEntry(storage)
-            .forEach { it.printDetails() }
+    init {
+        CmdContext.setLogger(KotlinLogging.logger("LS"))
     }
+
+    override fun run() = CmdContext.listEntry().forEach { it.printDetails() }
 }

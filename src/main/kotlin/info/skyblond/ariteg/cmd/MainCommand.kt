@@ -33,7 +33,8 @@ class MainCommand : CliktCommand() {
             IntegrityCheckCommand(),
             VerifyEntryCommand(),
             UploadCommand(),
-            DownloadCommand()
+            DownloadCommand(),
+            RunJSCommand()
         )
     }
 
@@ -69,7 +70,7 @@ class MainCommand : CliktCommand() {
 
             else -> error("Unknown schema in $connectString")
         }
-        Global.setStorage(storage)
+        CmdContext.setStorage(storage)
     }
 }
 

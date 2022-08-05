@@ -26,6 +26,7 @@ object Operations {
     /**
      * Digest the [root] file, slice it and save as an [Entry]
      * */
+    @JvmStatic
     fun digest(root: File, slicerProvider: SlicerProvider, storage: Storage): Entry {
         val rootLink = internalDigest(root, slicerProvider, storage)
         val entry = Entry(root.name, rootLink.get(), Date(), "")
@@ -124,6 +125,7 @@ object Operations {
      * Get all [Blob] links related to the given [entry].
      * By design, non-blob objects should not be archived and can be accessed instantly.
      * */
+    @JvmStatic
     fun resolve(entry: Entry, storage: Storage): Set<Link> {
         return storage.resolve(entry.link).get()
     }
@@ -132,6 +134,7 @@ object Operations {
      * Reconstruct the whole content according to the given [entry].
      * The blobs must be recovered first.
      * */
+    @JvmStatic
     fun restore(entry: Entry, storage: Storage, root: File) {
         if (root.exists()) {
             check(root.isDirectory) { "Root folder is a file: ${root.canonicalPath}" }
@@ -188,6 +191,7 @@ object Operations {
     /**
      * List all existing entries
      * */
+    @JvmStatic
     fun listEntry(storage: Storage): List<Entry> {
         return storage.listEntry().toList()
     }
@@ -195,6 +199,7 @@ object Operations {
     /**
      * Delete entry
      * */
+    @JvmStatic
     fun deleteEntry(entry: Entry, storage: Storage) {
         storage.removeEntry(entry).get()
     }
@@ -202,6 +207,7 @@ object Operations {
     /**
      * Delete all unreachable objects
      * */
+    @JvmStatic
     fun gc(storage: Storage) {
         val listObjectsFuture = storage.listObjects()
         val workingQueue = LinkedList<Link>()
@@ -259,6 +265,7 @@ object Operations {
         deletingQueue.forEach { it.get() }
     }
 
+    @JvmStatic
     fun integrityCheck(storage: Storage) {
         val listObjectsFuture = storage.listObjects()
         logger.info { "Listing current objects..." }
