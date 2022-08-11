@@ -1,60 +1,45 @@
 # Ariteg
 
-**This project has been restarted.**
-
-
-Archiving your data using Merkle tree/dag, ~~and store it with S3 deep archive layer.~~
+Archiving your data using Merkle tree/dag, hopefully you can save some space by doing so.
 
 ***Use [restic](https://github.com/restic/restic) if you just want to store your
 file and dedup at chunk level. It supports AWS S3.***
 
-## Merkle DAG?
+***WARNING: This is a simple project which is not meant to be maintained for a long time.
+This is for my own use and learning. There is no promise about stability, performance, or safety.
+You're using this at your own risk. You have been warned.***
 
-Just like IPFS, restic and other chunk level deduplication system, this program
-slice files into smaller chunks. Some chunks might have identical data, so we can
-keep only one copy of those chunks and call it duplication. To organize those
-chunks, we use hash and some tree-like structure. However, the deduplication breaks
-the tree: normally a node in a tree can only have 1 father node, but now with
-deduplication, a node can have multiple father node, so it becomes a DAG.
+### How to use?
 
-The hash part is not ideal in real world: Hash can collide. In this program, I used
-two different hash function and concat the result. More specifically, SHA3-512 and
-blake2b-512, using multihash base58 encode, concat with `,`. This will ensure the
-safety even SHA3-512 is collided on some chunks. But there is still a change when
-SHA3-512 and black2b-512 collided at the same time, and, if this happens to you,
-congratulations, you're the chosen one, LOL.
+Read [wiki](https://github.com/hurui200320/Ariteg/wiki) for more detailed info.
 
-## S3? Deep archive?
+There are 3 maven modules which you can build and publish to your local repo.
+This is not a long term project and I don't want to maintain it in the future,
+so, no maven repo is published.
 
-S3 is a reliable storage service from AWS. The deep archive layer offers a great
-price to store cold data. And I originally want to design a tool to utilize that,
-aka, slice files into chunks and uploaded to S3 deep archive layer. When I don't
-need those data, I can let them set there for around 1 USD per TB per month. And
-whenever I need it, the tool will restore those chunks and reconstruct the file.
+The group id is `info.skyblond.ariteg`. The artifact id is `ariteg-cmd`, `ariteg-core`,
+and `ariteg-minio`.
 
-The storage price is cheap, however, the request fee is not. Assuming the max chunk
-size is 2MB, then a 1TB file will be 524288 chunks or more. With each chunk equals
-to a S3 object, the restore request itself will cost around 13 USD. And before that,
-to make your object become deep archive, you need around 26 USD for lifecycle
-transition requests fee. The lifecycle fee is one time, and restore fee is charged
-everytime you restore files. And the last fee, data transfer fee, is 90 USD per TB.
+The `ariteg-core` is the pure implementation. It can be used as a lib. By default,
+it supports File storage, where each node is a file on the disk/SMB/NFS. If you
+want to use minio directly, you need `ariteg-minio`, which add MinioStorage, where
+each node is a object.
 
-For example, I have 40TB of Blu-ray disc rip off to storage. assuming every chunk
-is max size, then, at least we need to deal with 20971520 chunks, not including
-other metadata. Uploading those data will cost 1048.576 USD. Assuming I consume
-1 TB per month, aka restore and download 1 TB of contents from AWS S3, the restored
-copy stay 5 days before deleted,the restore fee is 13.1072 USD per month, the temp
-storage fee is 4 USD per month, the download request fee is 0.2097 USD per month,
-and the download fee is 92.16 USD per month. In total, monthly cost is around
-40.5504 USD (storage) + 110 USD (usage) = 150 USD, with initial setup fee 1048.58 USD.
-Also, deep archive layer requires you to store your data at least 180 days,
-roughly 6 months. So the minimal fee is 1048.58 + 243.3 = 1291.9 USD (just store 6 months).
+The `ariteg-cmd` is mostly useless. That module offers a default CLI for user to
+upload, download, and list data. Normally, you won't need to import that module.
 
-If I have a self-hosted NAS, for example, Synology DS1520+ with 5 x 12TB disks.
-The initial setup fee will be 700 USD + 5 x 230 USD = 1850 USD. The monthly fee
-is roughly less than 20 USD (120W x 24H per day x 30 day). Even with 2 disk
-replacements per year (very unlikely), the monthly cost is less than 100 USD.
+The CLI interface also offers a simple JavaScript runtime, implemented by [Mozilla Rhino](https://github.com/mozilla/rhino).
+Read wiki for more detailed info.
 
-But this is not the end of the story. S3 protocol itself is very useful. And this
-program support [Minio](https://min.io/), so you can host your own s3 gateway on
-your home lab server/nas.
+For CLI artifact, you can refer to GitHub release, where the GitHub action will
+automatically build and publish.
+
+
+### AGPL? WTF??
+
+Yes, I choose AGPL v3. Since my plan is to write code and push, no maintain in the future,
+you shouldn't use my code in your production env, unless you carefully reviewed the code.
+And to prevent someone accidentally use those code, I use AGPL v3 license.
+
+However, if you want a commercial friendly license, emailed me (or open an issue),
+and I'm glad to give you one.
