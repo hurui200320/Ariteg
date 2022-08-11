@@ -16,7 +16,7 @@ object VersionUtils {
     fun getMonth(): String = "%02d".format(calendar.get(Calendar.MONTH) + 1)
 
     @JvmStatic
-    fun getDayHourMinuteSecond(): String = "%02d".format(
+    fun getDayHourMinuteSecond(): String = "%02d%02d%02d%02d".format(
         calendar.get(Calendar.DAY_OF_MONTH),
         calendar.get(Calendar.HOUR_OF_DAY),
         calendar.get(Calendar.MINUTE),
