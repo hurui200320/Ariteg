@@ -10,8 +10,6 @@ name: Build dist of ariteg-cmd
 on:
   push:
     branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
 
 permissions:
   contents: read
