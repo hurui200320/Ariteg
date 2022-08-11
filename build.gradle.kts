@@ -52,6 +52,17 @@ subprojects {
         plugin("maven-publish")
     }
     publishing {
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/hurui200320/Ariteg")
+                credentials {
+                    username = System.getenv("USERNAME")
+                    password = System.getenv("TOKEN")
+                }
+            }
+        }
+
         publications {
             create<MavenPublication>("maven") {
                 groupId = "info.skyblond.ariteg"
