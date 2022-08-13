@@ -18,6 +18,8 @@ dependencies {
     implementation(libs.clikt)
     // Mozilla Rhino, running js on JVM
     implementation(libs.mozilla.rhino)
+    // commons-io
+    implementation(libs.commons.io)
     // ariteg-core
     implementation(project(":ariteg-core"))
     // ariteg-minio

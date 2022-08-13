@@ -96,12 +96,12 @@ internal class FileStorageTest {
 
         assertEquals(1, fileStorage.listEntry().count())
 
-        fileStorage.removeEntry(entry).get()
+        fileStorage.removeEntry(entry.id).get()
 
         assertEquals(0, fileStorage.listEntry().count())
 
         assertDoesNotThrow {
-            fileStorage.removeEntry(entry).get()
+            fileStorage.removeEntry(entry.id).get()
         }
 
         File(baseDir, "entry").let {

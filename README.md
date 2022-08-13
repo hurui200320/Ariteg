@@ -31,8 +31,8 @@ upload, download, and list data. Normally, you won't need to import that module.
 The CLI interface also offers a simple JavaScript runtime, implemented by [Mozilla Rhino](https://github.com/mozilla/rhino).
 Read wiki for more detailed info.
 
-For CLI artifact, you can refer to GitHub release, where the GitHub action will
-automatically build and publish.
+For CLI artifact, you can refer to [GitHub Action](https://github.com/hurui200320/Ariteg/actions/workflows/gradle-build-ariteg-cmd.yml),
+where the GitHub action will automatically build and publish.
 
 
 ### AGPL? WTF??

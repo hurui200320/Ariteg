@@ -137,12 +137,12 @@ internal class MinioStorageTest {
 
         assertEquals(1, minioStorage.listEntry().count())
 
-        minioStorage.removeEntry(entry).get()
+        minioStorage.removeEntry(entry.id).get()
 
         assertEquals(0, minioStorage.listEntry().count())
 
         assertDoesNotThrow {
-            minioStorage.removeEntry(entry).get()
+            minioStorage.removeEntry(entry.id).get()
         }
     }
 }

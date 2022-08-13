@@ -8,6 +8,8 @@ abstract class AbstractStorage<PathType> : Storage {
 
     protected abstract val key: ByteArray?
 
+    override fun isEncrypted(): Boolean = key != null
+
     /**
      * In case multiple thread write the same file at the same time,
      * this set records all writing paths. When writing, first claim
@@ -184,8 +186,8 @@ abstract class AbstractStorage<PathType> : Storage {
         entry
     }
 
-    final override fun removeEntry(entry: Entry): CompletableFuture<Void> = CompletableFuture.runAsync {
-        val path = mapToPath("entry", entry.id)
+    final override fun removeEntry(entryId: String): CompletableFuture<Void> = CompletableFuture.runAsync {
+        val path = mapToPath("entry", entryId)
         internalDelete(path)
     }
 

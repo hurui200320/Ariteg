@@ -19,7 +19,7 @@ class MainCommand : CliktCommand() {
         envvar = "ARITEG_CONNECT_STRING",
     ).required()
 
-    private val keyBase64: String by option(hidden = true).prompt(
+    private val keyBase64: String by option("--encryption-key", hidden = true).prompt(
         "Base64 encoded key",
         default = "",
         hideInput = true
