@@ -18,9 +18,8 @@ class UploadCommand : CliktCommand(
             canBeDir = true
         ).multiple()
 
-    init {
+    override fun run() {
         CmdContext.setLogger(KotlinLogging.logger("Upload"))
+        CmdContext.upload(files)
     }
-
-    override fun run() = CmdContext.upload(files)
 }

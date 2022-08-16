@@ -7,9 +7,8 @@ class GCCommand : CliktCommand(
     name = "gc",
     help = "Remove all unused objects"
 ) {
-    init {
+    override fun run() {
         CmdContext.setLogger(KotlinLogging.logger("GC"))
+        CmdContext.gc()
     }
-
-    override fun run() = CmdContext.gc()
 }

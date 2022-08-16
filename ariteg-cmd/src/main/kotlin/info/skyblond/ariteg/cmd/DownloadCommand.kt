@@ -18,9 +18,8 @@ class DownloadCommand : CliktCommand(
             canBeDir = true
         )
 
-    init {
+    override fun run() {
         CmdContext.setLogger(KotlinLogging.logger("Upload"))
+        CmdContext.download(id, file)
     }
-
-    override fun run() = CmdContext.download(id, file)
 }

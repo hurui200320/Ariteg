@@ -8,16 +8,20 @@ import java.io.File
 import java.util.concurrent.CompletableFuture
 
 object CmdContext {
+    @JvmStatic
     lateinit var storage: Storage
         private set
 
+    @JvmStatic
     lateinit var logger: KLogger
         private set
 
+    @JvmStatic
     @Suppress("MemberVisibilityCanBePrivate")
     val slicerProvider
         get() = getSlicerProvider()
 
+    @JvmStatic
     fun setStorage(storage: Storage) {
         CmdContext.storage = storage
     }
@@ -26,6 +30,7 @@ object CmdContext {
         CmdContext.logger = logger
     }
 
+    @JvmStatic
     fun download(id: String, rootFolder: File) {
         logger.info { "Finding entry..." }
         val entry = Operations.listEntry(storage)
@@ -35,22 +40,26 @@ object CmdContext {
         logger.info { "Done" }
     }
 
+    @JvmStatic
     fun gc() {
         logger.info { "Starting gc..." }
         Operations.gc(storage)
         logger.info { "Done" }
     }
 
+    @JvmStatic
     fun integrityCheck(deleting: Boolean) {
         logger.info { "Starting integrity check..." }
         Operations.integrityCheck(storage, deleting)
         logger.info { "Done" }
     }
 
+    @JvmStatic
     fun listEntry(): List<Entry> {
         return Operations.listEntry(storage)
     }
 
+    @JvmStatic
     fun removeEntry(ids: List<String>) {
         logger.info { "Listing entries..." }
         val entries = Operations.listEntry(storage)
@@ -64,6 +73,7 @@ object CmdContext {
         }
     }
 
+    @JvmStatic
     fun upload(files: List<File>) {
         files.map { file ->
             logger.info { "Uploading ${file.canonicalPath}" }
@@ -77,6 +87,7 @@ object CmdContext {
         logger.info { "Done" }
     }
 
+    @JvmStatic
     fun verifyEntry(ids: List<String>) {
         logger.info { "Listing entries..." }
         Operations.listEntry(storage).forEach { entry ->

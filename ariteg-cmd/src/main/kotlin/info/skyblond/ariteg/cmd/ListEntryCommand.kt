@@ -7,9 +7,8 @@ class ListEntryCommand : CliktCommand(
     name = "ls",
     help = "List all entries in the given storage"
 ) {
-    init {
+    override fun run() {
         CmdContext.setLogger(KotlinLogging.logger("LS"))
+        CmdContext.listEntry().forEach { it.printDetails() }
     }
-
-    override fun run() = CmdContext.listEntry().forEach { it.printDetails() }
 }
