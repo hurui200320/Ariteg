@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("java")
-    kotlin("jvm") version "1.7.0"
+    kotlin("jvm") version "1.7.10"
     id("maven-publish")
 }
 

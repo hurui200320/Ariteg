@@ -13,9 +13,8 @@ class VerifyEntryCommand : CliktCommand(
         name = "ID", help = "Entry ids. Empty means check all entries"
     ).multiple()
 
-    init {
+    override fun run() {
         CmdContext.setLogger(KotlinLogging.logger("Verify"))
+        CmdContext.verifyEntry(ids)
     }
-
-    override fun run() = CmdContext.verifyEntry(ids)
 }

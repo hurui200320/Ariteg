@@ -206,7 +206,7 @@ object Operations {
      * */
     @JvmStatic
     fun deleteEntry(entry: Entry, storage: Storage) {
-        storage.removeEntry(entry).get()
+        storage.removeEntry(entry.id).get()
     }
 
     /**

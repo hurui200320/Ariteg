@@ -11,9 +11,8 @@ class RemoveEntryCommand : CliktCommand(
 ) {
     private val ids: List<String> by argument(name = "ID", help = "Entry ids").multiple()
 
-    init {
+    override fun run() {
         CmdContext.setLogger(KotlinLogging.logger("GC"))
+        CmdContext.removeEntry(ids)
     }
-
-    override fun run() = CmdContext.removeEntry(ids)
 }

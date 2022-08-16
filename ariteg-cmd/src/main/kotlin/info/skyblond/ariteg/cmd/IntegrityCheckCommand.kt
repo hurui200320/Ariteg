@@ -14,9 +14,8 @@ class IntegrityCheckCommand : CliktCommand(
         .convert { it.toBoolean() }
         .default(false)
 
-    init {
+    override fun run() {
         CmdContext.setLogger(KotlinLogging.logger("IntegrityCheck"))
+        CmdContext.integrityCheck(deleting)
     }
-
-    override fun run() = CmdContext.integrityCheck(deleting)
 }

@@ -3,12 +3,9 @@ package info.skyblond.ariteg.cmd
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.types.file
-import info.skyblond.ariteg.Operations
 import mu.KotlinLogging
-import org.mozilla.javascript.Context
-import org.mozilla.javascript.Scriptable
-import org.mozilla.javascript.ScriptableObject
 import java.io.File
+import javax.script.ScriptEngineManager
 
 class RunJSCommand : CliktCommand(
     name = "run",
@@ -23,35 +20,15 @@ class RunJSCommand : CliktCommand(
         )
 
     init {
-        CmdContext.setLogger(KotlinLogging.logger("Script"))
+        System.setProperty("nashorn.args", "--language=es6")
     }
 
     override fun run() {
-        val cx = Context.enter()
-        try {
-            val scope: Scriptable = cx.initStandardObjects()
-
-            Context.javaToJS(CmdContext, scope)
-                .let { ScriptableObject.putProperty(scope, "context", it) }
-
-            Context.javaToJS(CmdContext.logger, scope)
-                .let { ScriptableObject.putProperty(scope, "logger", it) }
-
-            Context.javaToJS(Operations, scope)
-                .let { ScriptableObject.putProperty(scope, "operations", it) }
-
-            @Suppress("unused")
-            Context.javaToJS(object {
-                fun createFile(path: String): File = File(path)
-            }, scope)
-                .let { ScriptableObject.putProperty(scope, "utils", it) }
-
-
-            scriptFile.bufferedReader().use {
-                cx.evaluateReader(scope, it, scriptFile.name, 0, null)
-            }
-        } finally {
-            Context.exit()
+        CmdContext.setLogger(KotlinLogging.logger("Script"))
+        val engineManager = ScriptEngineManager()
+        val engine = engineManager.getEngineByName("nashorn")!!
+        scriptFile.bufferedReader().use {
+            engine.eval(it)
         }
     }
 }

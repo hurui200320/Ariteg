@@ -16,8 +16,10 @@ application {
 dependencies {
     // clikt
     implementation(libs.clikt)
-    // Mozilla Rhino, running js on JVM
-    implementation(libs.mozilla.rhino)
+    // oracle nashorn
+    implementation(libs.nashorn)
+    // commons-io
+    implementation(libs.commons.io)
     // ariteg-core
     implementation(project(":ariteg-core"))
     // ariteg-minio

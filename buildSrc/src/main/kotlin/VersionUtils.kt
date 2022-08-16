@@ -3,12 +3,6 @@ import java.util.*
 object VersionUtils {
     private val calendar = Calendar.getInstance()
 
-    /**
-     * e.g.: 2022.07.2-$suffix
-     * The hyphen will be hidden if the suffix is empty.
-     * */
-    const val suffix = "alpha"
-
     @JvmStatic
     fun getYear(): String = calendar.get(Calendar.YEAR).toString()
 
@@ -30,7 +24,6 @@ object VersionUtils {
     fun get(): String = "%02d".format(calendar.get(Calendar.HOUR_OF_DAY))
 
     @JvmStatic
-    fun getVersion(): String =
-        "${getYear()}.${getMonth()}.${getDayHourMinuteSecond()}${if (suffix.isNotEmpty()) "-" else ""}${suffix}"
+    fun getVersion(): String = "${getYear()}.${getMonth()}.${getDayHourMinuteSecond()}"
 
 }

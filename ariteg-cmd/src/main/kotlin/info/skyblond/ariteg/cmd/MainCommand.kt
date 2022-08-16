@@ -2,9 +2,6 @@ package info.skyblond.ariteg.cmd
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.prompt
-import com.github.ajalt.clikt.parameters.options.required
 import info.skyblond.ariteg.storage.FileStorage
 import info.skyblond.ariteg.storage.MinioStorage
 import io.minio.MinioClient
@@ -12,18 +9,15 @@ import java.io.File
 import java.util.*
 
 class MainCommand : CliktCommand() {
-    private val connectString: String by option(
-        "-c", "--connect-string",
-        help = "Connect string",
-        metavar = "STRING",
-        envvar = "ARITEG_CONNECT_STRING",
-    ).required()
+    private val connectStringEnv = "ARITEG_CONNECT_STR"
+    private val encryptionKeyEnv = "ARITEG_ENCRYPTION_KEY"
 
-    private val keyBase64: String by option(hidden = true).prompt(
-        "Base64 encoded key",
-        default = "",
-        hideInput = true
-    )
+    private val connectString: String
+        get() = System.getenv(connectStringEnv) ?: error("Env `${connectStringEnv}` not set")
+    private val keyBase64: String
+        get() = System.getenv(encryptionKeyEnv)
+            ?: "".also { System.err.println("Env `${encryptionKeyEnv}` not set, no encryption") }
+
 
     init {
         subcommands(
