@@ -17,8 +17,21 @@ object Operations {
         return "%.2f".format(number)
     }
 
+    /**
+     * Limit how many objects are pending.
+     * Measured by free memory.
+     *
+     * TODO: How to read slicer config
+     * */
     fun getLimitingSemaphore(): Semaphore =
-        Semaphore(Runtime.getRuntime().availableProcessors() * 2)
+        Runtime.getRuntime().freeMemory().let { free ->
+            // we only use 70% of free memory for object caching
+            val part = free * 0.7
+            // each object is 1MB on average
+            val count = (part / MEGA_BYTE).toInt()
+            logger.info { "Semaphore: $count" }
+            Semaphore(count)
+        }
 
     /**
      * Digest the [root] file, slice it and save as an [Entry]
@@ -292,7 +305,7 @@ object Operations {
                     semaphore.release()
                     if (it is AritegObject.HashNotMatchException) {
                         // exception means the hash is not correct
-                        logger.info { "Hash not match on ${link.hash}, deleting..." }
+                        logger.info { "Hash not match on ${link.hash}" }
                         link
                     } else {
                         throw it
