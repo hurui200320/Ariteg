@@ -24,4 +24,8 @@ dependencies {
     implementation(project(":ariteg-core"))
     // ariteg-minio
     implementation(project(":ariteg-minio"))
+    // jnr-fuse
+    implementation(libs.fnr.fuse)
+    // caffeine
+    implementation(libs.caffeine)
 }

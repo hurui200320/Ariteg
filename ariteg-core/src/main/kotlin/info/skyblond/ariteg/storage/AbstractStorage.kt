@@ -108,7 +108,7 @@ abstract class AbstractStorage<PathType> : Storage {
                 writingPathSet.remove(path)
             }
 
-            Link(hash, type)
+            Link(hash, type, rawData.size.toLong())
         }
 
 

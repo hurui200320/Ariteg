@@ -22,7 +22,7 @@ class OperationsMockTest {
 
     @Test
     fun testResolve() {
-        val link = Link("Something", Link.Type.BLOB)
+        val link = Link("Something", Link.Type.BLOB, -1)
         `when`(storage.resolve(link)).thenReturn(CompletableFuture.supplyAsync { emptySet() })
         Operations.resolve(Entry("name", link, Date()), storage)
         verify(storage, times(1)).resolve(link)

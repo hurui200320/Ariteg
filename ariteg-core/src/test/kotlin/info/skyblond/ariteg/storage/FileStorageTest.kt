@@ -33,6 +33,7 @@ internal class FileStorageTest {
     fun testBlob() {
         val blob = Blob(Random.nextBytes(64))
         val link = fileStorage.write(BLOB, blob).get()
+        assertEquals(64, link.size)
         val blobR = fileStorage.read(link).get() as Blob
         assertEquals(blob, blobR)
         fileStorage.delete(link).get()
@@ -49,7 +50,7 @@ internal class FileStorageTest {
 
     @Test
     fun testList() {
-        val list = ListObject(listOf(Link("something", BLOB)))
+        val list = ListObject(listOf(Link("something", BLOB, -1)))
         val link = fileStorage.write(LIST, list).get()
         val listR = fileStorage.read(link).get() as ListObject
         assertEquals(list, listR)
@@ -63,7 +64,7 @@ internal class FileStorageTest {
 
     @Test
     fun testTree() {
-        val tree = TreeObject(listOf(Link("something", BLOB, "name")))
+        val tree = TreeObject(listOf(Link("something", BLOB, -1, "name")))
         val link = fileStorage.write(TREE, tree).get()
         val treeR = fileStorage.read(link).get() as TreeObject
         assertEquals(tree, treeR)
@@ -91,7 +92,7 @@ internal class FileStorageTest {
 
     @Test
     fun testEntry() {
-        val entry = Entry("name", Link("hash", BLOB), Date())
+        val entry = Entry("name", Link("hash", BLOB, -1), Date())
         fileStorage.addEntry(entry).get()
 
         assertEquals(1, fileStorage.listEntry().count())

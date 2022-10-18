@@ -68,6 +68,7 @@ internal class MinioStorageTest {
     fun testBlob() {
         val blob = Blob(Random.nextBytes(64))
         val link = minioStorage.write(Link.Type.BLOB, blob).get()
+        assertEquals(64, link.size)
         val blobR = minioStorage.read(link).get() as Blob
         assertEquals(blob, blobR)
         minioStorage.delete(link).get()
@@ -85,7 +86,7 @@ internal class MinioStorageTest {
 
     @Test
     fun testList() {
-        val list = ListObject(listOf(Link("something", Link.Type.BLOB)))
+        val list = ListObject(listOf(Link("something", Link.Type.BLOB, -1)))
         val link = minioStorage.write(Link.Type.LIST, list).get()
         val listR = minioStorage.read(link).get() as ListObject
         assertEquals(list, listR)
@@ -100,7 +101,7 @@ internal class MinioStorageTest {
 
     @Test
     fun testTree() {
-        val tree = TreeObject(listOf(Link("something", Link.Type.BLOB, "name")))
+        val tree = TreeObject(listOf(Link("something", Link.Type.BLOB, -1, "name")))
         val link = minioStorage.write(Link.Type.TREE, tree).get()
         val treeR = minioStorage.read(link).get() as TreeObject
         assertEquals(tree, treeR)
@@ -132,7 +133,7 @@ internal class MinioStorageTest {
 
     @Test
     fun testEntry() {
-        val entry = Entry("name", Link("hash", Link.Type.BLOB), Date())
+        val entry = Entry("name", Link("hash", Link.Type.BLOB, -1), Date())
         minioStorage.addEntry(entry).get()
 
         assertEquals(1, minioStorage.listEntry().count())

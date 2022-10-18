@@ -28,7 +28,8 @@ class MainCommand : CliktCommand() {
             VerifyEntryCommand(),
             UploadCommand(),
             DownloadCommand(),
-            RunJSCommand()
+            RunJSCommand(),
+            MountCommand()
         )
     }
 

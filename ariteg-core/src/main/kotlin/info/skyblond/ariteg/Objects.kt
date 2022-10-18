@@ -2,6 +2,7 @@ package info.skyblond.ariteg
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.annotation.JsonPropertyOrder
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.util.StdDateFormat
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -59,8 +60,15 @@ data class Blob(val data: ByteArray) : AbstractAritegObject() {
 data class Link(
     val hash: String,
     val type: Type,
+    val size: Long,
     val name: String? = null
 ) {
+    companion object {
+        fun blobRef(hash: String, name: String? = null): Link = Link(hash, Type.BLOB, -1, name)
+        fun listRef(hash: String, name: String? = null): Link = Link(hash, Type.LIST, -1, name)
+        fun treeRef(hash: String, name: String? = null): Link = Link(hash, Type.TREE, -1, name)
+    }
+
     enum class Type {
         BLOB, LIST, TREE
     }

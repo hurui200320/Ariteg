@@ -279,9 +279,9 @@ object Operations {
         logger.info { "Found ${blobs.size} unreachable blobs, ${lists.size} unreachable lists, and ${trees.size} unreachable trees" }
         // now what we left are unreachable objects
         val deletingQueue = LinkedList<CompletableFuture<Void>>()
-        blobs.forEach { deletingQueue.add(storage.delete(Link(it, Link.Type.BLOB))) }
-        lists.forEach { deletingQueue.add(storage.delete(Link(it, Link.Type.LIST))) }
-        trees.forEach { deletingQueue.add(storage.delete(Link(it, Link.Type.TREE))) }
+        blobs.forEach { deletingQueue.add(storage.delete(Link.blobRef(it))) }
+        lists.forEach { deletingQueue.add(storage.delete(Link.listRef(it))) }
+        trees.forEach { deletingQueue.add(storage.delete(Link.treeRef(it))) }
         deletingQueue.forEach { it.get() }
     }
 
@@ -294,7 +294,7 @@ object Operations {
         logger.info { "Listed ${blobs.size} blobs" }
         val semaphore = getLimitingSemaphore()
         val brokenList = blobs.mapIndexed { index, hash ->
-            val link = Link(hash, Link.Type.BLOB)
+            val link = Link.blobRef(hash)
             semaphore.acquire()
             if (index % 100 == 0) {
                 logger.info { "Checking ${index / 1000.0}K blobs" }
