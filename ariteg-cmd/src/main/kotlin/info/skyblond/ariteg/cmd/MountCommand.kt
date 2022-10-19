@@ -2,38 +2,35 @@ package info.skyblond.ariteg.cmd
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.arguments.multiple
-import com.github.ajalt.clikt.parameters.types.file
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.option
 import info.skyblond.ariteg.cmd.fuse.AritegFS
-import jnr.ffi.Platform
 import mu.KotlinLogging
-import java.io.File
 import java.nio.file.Paths
+import java.util.concurrent.ForkJoinPool
 
 class MountCommand : CliktCommand(
     name = "mount",
     help = "mount as FUSE"
 ) {
-    // TODO mount path, uid, gid, dir mask, file mask
-//    private val files: List<File> by argument(name = "Path", help = "Path to content to be uploaded")
-//        .file(
-//            mustExist = true,
-//            canBeFile = true,
-//            canBeDir = true
-//        ).multiple()
+    private val mountPath: String by argument(name = "path", help = "Path to mount the FUSE")
+
+    private val mountUid: String? by option("-u", "--uid", help = "Owner uid")
+    private val mountGid: String? by option("-g", "--gid", help = "Owner gid")
+    private val mountDirMask: String by option("-d", "--dir", help = "Dir mask (UGO)").default("0755")
+    private val mountFileMask: String by option("-f", "--file", help = "Dir mask (UGO)").default("0644")
 
     override fun run() {
         CmdContext.setLogger(KotlinLogging.logger("Mount"))
-        val memfs = AritegFS()
+        val memfs = AritegFS(
+            uid = mountUid?.toLong(),
+            gid = mountGid?.toLong(),
+            dirMask = mountDirMask.asOtcInt(),
+            fileMask = mountFileMask.asOtcInt()
+        )
         try {
-            val path: String = when (Platform.getNativePlatform().os) {
-                Platform.OS.WINDOWS -> "M:\\"
-                else -> "/tmp/mntm"
-            }
-            echo("Mounting... Press CTRL+C to exit")
-            memfs.mount(
-                Paths.get(path), true, false, arrayOf()
-            )
+            echo("Mounting to `$mountPath` Press CTRL+C to exit")
+            memfs.mount(Paths.get(mountPath), true, false)
         } finally {
             memfs.umount()
         }

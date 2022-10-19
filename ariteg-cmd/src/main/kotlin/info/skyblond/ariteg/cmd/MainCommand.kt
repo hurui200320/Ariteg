@@ -7,6 +7,7 @@ import info.skyblond.ariteg.storage.MinioStorage
 import io.minio.MinioClient
 import java.io.File
 import java.util.*
+import java.util.concurrent.ForkJoinPool
 
 class MainCommand : CliktCommand() {
     private val connectStringEnv = "ARITEG_CONNECT_STR"
@@ -67,6 +68,8 @@ class MainCommand : CliktCommand() {
             else -> error("Unknown schema in $connectString")
         }
         CmdContext.setStorage(storage)
+
+        echo("ForkJoinPool threads: ${ForkJoinPool.commonPool().parallelism}")
     }
 }
 
