@@ -1,3 +1,5 @@
+import kotlin.collections.listOf
+
 plugins {
     kotlin("jvm")
     application
@@ -10,6 +12,7 @@ description = "CLI for ariteg"
 
 application {
     mainClass.set("info.skyblond.ariteg.cmd.MainCommandKt")
+    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8")
     executableDir = ""
 }
 
@@ -24,4 +27,8 @@ dependencies {
     implementation(project(":ariteg-core"))
     // ariteg-minio
     implementation(project(":ariteg-minio"))
+    // jnr-fuse
+    implementation(libs.fnr.fuse)
+    // caffeine
+    implementation(libs.caffeine)
 }

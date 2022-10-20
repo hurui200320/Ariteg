@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("java")
-    kotlin("jvm") version "1.7.10"
+    kotlin("jvm") version "1.7.20"
     id("maven-publish")
 }
 
@@ -23,11 +23,11 @@ allprojects {
 
     dependencies {
         // kotlin logging
-        implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
-        implementation("ch.qos.logback:logback-classic:1.2.11")
+        implementation("io.github.microutils:kotlin-logging-jvm:3.0.0")
+        implementation("ch.qos.logback:logback-classic:1.4.3")
         // test
         testImplementation(kotlin("test"))
-        testImplementation("org.mockito:mockito-core:4.6.1")
+        testImplementation("org.mockito:mockito-core:4.8.0")
     }
 
     tasks.test {

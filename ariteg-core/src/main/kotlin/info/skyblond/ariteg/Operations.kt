@@ -17,8 +17,21 @@ object Operations {
         return "%.2f".format(number)
     }
 
+    /**
+     * Limit how many objects are pending.
+     * Measured by free memory.
+     *
+     * TODO: How to read slicer config
+     * */
     fun getLimitingSemaphore(): Semaphore =
-        Semaphore(Runtime.getRuntime().availableProcessors() * 2)
+        Runtime.getRuntime().freeMemory().let { free ->
+            // we only use 70% of free memory for object caching
+            val part = free * 0.7
+            // each object is 1MB on average
+            val count = (part / MEGA_BYTE).toInt()
+            logger.info { "Semaphore: $count" }
+            Semaphore(count)
+        }
 
     /**
      * Digest the [root] file, slice it and save as an [Entry]
@@ -266,9 +279,9 @@ object Operations {
         logger.info { "Found ${blobs.size} unreachable blobs, ${lists.size} unreachable lists, and ${trees.size} unreachable trees" }
         // now what we left are unreachable objects
         val deletingQueue = LinkedList<CompletableFuture<Void>>()
-        blobs.forEach { deletingQueue.add(storage.delete(Link(it, Link.Type.BLOB))) }
-        lists.forEach { deletingQueue.add(storage.delete(Link(it, Link.Type.LIST))) }
-        trees.forEach { deletingQueue.add(storage.delete(Link(it, Link.Type.TREE))) }
+        blobs.forEach { deletingQueue.add(storage.delete(Link.blobRef(it))) }
+        lists.forEach { deletingQueue.add(storage.delete(Link.listRef(it))) }
+        trees.forEach { deletingQueue.add(storage.delete(Link.treeRef(it))) }
         deletingQueue.forEach { it.get() }
     }
 
@@ -281,7 +294,7 @@ object Operations {
         logger.info { "Listed ${blobs.size} blobs" }
         val semaphore = getLimitingSemaphore()
         val brokenList = blobs.mapIndexed { index, hash ->
-            val link = Link(hash, Link.Type.BLOB)
+            val link = Link.blobRef(hash)
             semaphore.acquire()
             if (index % 100 == 0) {
                 logger.info { "Checking ${index / 1000.0}K blobs" }
@@ -292,7 +305,7 @@ object Operations {
                     semaphore.release()
                     if (it is AritegObject.HashNotMatchException) {
                         // exception means the hash is not correct
-                        logger.info { "Hash not match on ${link.hash}, deleting..." }
+                        logger.info { "Hash not match on ${link.hash}" }
                         link
                     } else {
                         throw it
