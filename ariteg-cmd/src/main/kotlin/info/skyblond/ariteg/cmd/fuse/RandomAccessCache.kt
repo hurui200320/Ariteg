@@ -2,12 +2,11 @@ package info.skyblond.ariteg.cmd.fuse
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
-import info.skyblond.ariteg.Blob
-import info.skyblond.ariteg.Link
-import info.skyblond.ariteg.ListObject
-import info.skyblond.ariteg.TreeObject
+import info.skyblond.ariteg.*
 import info.skyblond.ariteg.cmd.CmdContext
+import java.io.FileNotFoundException
 import java.math.BigInteger
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
 /**
@@ -85,6 +84,34 @@ object RandomAccessCache {
             tree
         } catch (t: Throwable) {
             CmdContext.logger.error(t) { "Failed to read $link" }
+            null
+        }
+    }
+
+    // ------------------------------ Entry cache ------------------------------
+    /**
+     * Cache entry, so it will be faster when resolving path.
+     * The path can be updated, so each cache's TTL is 10s.
+     * */
+    private val entryCache: Cache<String, Entry> = Caffeine.newBuilder()
+        .expireAfterWrite(10, TimeUnit.SECONDS)
+        .softValues()
+        .build()
+
+    fun getCachedEntry(id: String): Entry? {
+        // return if found
+        entryCache.getIfPresent(id)?.let { return it }
+        // not found, read it
+        return try {
+            val entry = CmdContext.storage.getEntry(id).get()
+            entryCache.put(id, entry)
+            entry
+        } catch (t: ExecutionException) {
+            if (t.cause !is FileNotFoundException)
+                CmdContext.logger.error(t) { "Failed to read entry $id" }
+            null
+        } catch (t: Throwable) {
+            CmdContext.logger.error(t) { "Failed to read entry $id" }
             null
         }
     }

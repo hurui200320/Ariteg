@@ -49,6 +49,11 @@ interface Storage : AutoCloseable {
     fun removeEntry(entryId: String): CompletableFuture<Void>
 
     /**
+     * Get the entry by id. Async.
+     * */
+    fun getEntry(entryId: String): CompletableFuture<Entry>
+
+    /**
      * List all entry in the system. Request new data on the go.
      * */
     fun listEntry(): Iterable<Entry>

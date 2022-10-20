@@ -186,6 +186,12 @@ abstract class AbstractStorage<PathType> : Storage {
         entry
     }
 
+    final override fun getEntry(entryId: String): CompletableFuture<Entry> = CompletableFuture.supplyAsync {
+        val path = mapToPath("entry", entryId)
+        val json = internalRead(path).decodeToString()
+        Entry.fromJson(json)
+    }
+
     final override fun removeEntry(entryId: String): CompletableFuture<Void> = CompletableFuture.runAsync {
         val path = mapToPath("entry", entryId)
         internalDelete(path)

@@ -49,7 +49,7 @@ class AritegFS(
             .split('/')
             .let { seg ->
                 val entryId = seg[0].split(" ")[0]
-                var link = CmdContext.storage.listEntry().find { it.id == entryId }?.link
+                var link = RandomAccessCache.getCachedEntry(entryId)?.link
                     ?: return null to -ErrorCodes.ENOENT()
 
                 for (i in 1 until seg.size) {
@@ -71,7 +71,7 @@ class AritegFS(
             .split('/')
             .let { seg ->
                 val entryId = seg[0].split(" ")[0]
-                CmdContext.storage.listEntry().find { it.id == entryId }
+                RandomAccessCache.getCachedEntry(entryId)
             }
 
     private fun mapEntryToFileName(entry: Entry): String {
