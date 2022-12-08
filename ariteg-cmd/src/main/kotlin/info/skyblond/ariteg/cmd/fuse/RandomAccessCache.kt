@@ -117,6 +117,11 @@ object RandomAccessCache {
     }
 
     // ------------------------------ Blob index cache ------------------------------
+    data class FileIndexEntry(
+        val offset: Long,
+        val link: Link
+    )
+
     /**
      * This is the cache for random access index.
      * On disk, Files can be represented in a messy style:
@@ -124,14 +129,15 @@ object RandomAccessCache {
      * It can be a fancy tree, but not easy to make random access.
      * During reading, it would be great to have a flattened list:
      * List[BLOB, BLOB, BLOB, ...]
-     * That will make offset faster.
-     * TODO this is a simple linked index, might need anchor index like:
-     *      [0K -> BLOB#1, 16K -> BLOB#15, 32K -> BLOB#34, ...]?
+     * To make it even faster, the index will log each blob's offset:
+     * [0K -> BLOB#1, 16K -> BLOB#15, 32K -> BLOB#34, ...]
      *
      * This cache is essential to read operations, so keep it longer in the RAM.
+     *
+     * About long: The offset from FUSE is Long. We don't need BigInteger.
      * */
-    private val blobIndexCache: Cache<String, List<Link>> = Caffeine.newBuilder()
-        .expireAfterAccess(5, TimeUnit.MINUTES)
+    private val blobIndexCache: Cache<String, List<FileIndexEntry>> = Caffeine.newBuilder()
+        .expireAfterAccess(15, TimeUnit.MINUTES)
         .build()
 
     private fun flatten(link: Link): List<Link> {
@@ -144,12 +150,16 @@ object RandomAccessCache {
         }
     }
 
-    fun getIndex(link: Link): List<Link>? {
+    fun getIndex(link: Link): List<FileIndexEntry>? {
         // return if found
         blobIndexCache.getIfPresent(link.hash)?.let { return it }
         // not found
         return try {
-            val result = flatten(link)
+            val flattened = flatten(link)
+            var offset = 0L
+            val result = flattened.map { l ->
+                (FileIndexEntry(offset, l)).also { offset += l.size }
+            }
             blobIndexCache.put(link.hash, result)
             result
         } catch (t: Throwable) {

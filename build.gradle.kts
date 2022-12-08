@@ -23,11 +23,11 @@ allprojects {
 
     dependencies {
         // kotlin logging
-        implementation("io.github.microutils:kotlin-logging-jvm:3.0.0")
-        implementation("ch.qos.logback:logback-classic:1.4.3")
+        implementation("io.github.microutils:kotlin-logging-jvm:3.0.4")
+        implementation("ch.qos.logback:logback-classic:1.4.5")
         // test
         testImplementation(kotlin("test"))
-        testImplementation("org.mockito:mockito-core:4.8.0")
+        testImplementation("org.mockito:mockito-core:4.9.0")
     }
 
     tasks.test {

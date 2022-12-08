@@ -13,7 +13,6 @@ import ru.serce.jnrfuse.struct.FileStat
 import ru.serce.jnrfuse.struct.FuseFileInfo
 import ru.serce.jnrfuse.struct.Statvfs
 import java.math.BigInteger
-import kotlin.math.max
 import kotlin.math.min
 
 class AritegFS(
@@ -197,41 +196,34 @@ class AritegFS(
         if (link == null) return errorCode
         // the link should be list or blob.
         if (link.type == Link.Type.TREE) return -ErrorCodes.EISDIR()
-        // try to get index
-        val raIndex = RandomAccessCache.getIndex(link) ?: return -ErrorCodes.EIO()
-        // skip the offset, find the first obj to read
-        var walkedCount = 0L
+        // try to get index, and find the first blob we need
+        val blobs = (RandomAccessCache.getIndex(link) ?: return -ErrorCodes.EIO())
+            // starting offset + size of blob <= offset, skip it
+            .dropWhile { (blobOffset, blobLink) -> blobOffset + blobLink.size < offset }
+            // take only if starting offset is in range
+            .takeWhile { (blobOffset, _) -> blobOffset <= offset + size }
+
+        // read in a loop
         var readCount = 0L
-        // loop to process
-        // the index use ArrayList, won't exceed Int.MAX_VALUE anyway
-        for (i in raIndex.indices) {
-            val objLink = raIndex[i]
-            if (offset - walkedCount > objLink.size) {
-                // need more walk, skip this obj
-                walkedCount += objLink.size
-                continue
+        for (i in blobs.indices) {
+            val objLink = blobs[i].link
+            // if this is the first blob, we need to account the skipped part
+            // else, reading from 0
+            val iOffset = if (i != 0) 0 else offset - blobs.first().offset
+            // find out how much data we read
+            val iSize = min(objLink.size - iOffset, size - readCount)
+            try {
+                // read the blob
+                val blob = RandomAccessCache.getCachedBlob(objLink) ?: return -ErrorCodes.EIO()
+                // copy data
+                buf.put(readCount, blob.data, iOffset.toInt(), iSize.toInt())
+                readCount += iSize
+            } catch (t: Throwable) {
+                logger.error(t) { "Error when reading $link at path $path" }
+                return -ErrorCodes.EIO()
             }
-            if (walkedCount + objLink.size > offset) {
-                // this is the object we want to read
-                // find the starting point
-                val iOffset = max(0, offset - walkedCount)
-                // find out how much data we read
-                val iSize = min(objLink.size - iOffset, size - readCount)
-                try {
-                    // read the blob
-                    val blob = RandomAccessCache.getCachedBlob(objLink) ?: return -ErrorCodes.EIO()
-                    // copy data
-                    buf.put(readCount, blob.data, iOffset.toInt(), iSize.toInt())
-                    // update walked and read count
-                    walkedCount += objLink.size
-                    readCount += iSize
-                } catch (t: Throwable) {
-                    logger.error(t) { "Error when reading $link at path $path" }
-                    return -ErrorCodes.EIO()
-                }
-                if (readCount >= size)
-                    break
-            }
+            if (readCount >= size)
+                break
         }
 
         return readCount.toInt() // return the number of actual bytes read

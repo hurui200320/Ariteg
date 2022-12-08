@@ -31,4 +31,6 @@ dependencies {
     implementation(libs.fnr.fuse)
     // caffeine
     implementation(libs.caffeine)
+    // kotlin coroutines
+    implementation(libs.kotlinx.coroutine)
 }
