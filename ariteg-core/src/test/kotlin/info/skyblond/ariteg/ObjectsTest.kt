@@ -1,5 +1,6 @@
 package info.skyblond.ariteg
 
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -7,7 +8,7 @@ import java.util.*
 
 internal class ObjectsTest {
     @Test
-    fun testHash() {
+    fun testHash() = runBlocking {
         val aritegObjects = listOf<AritegObject>(
             Blob(ByteArray(10)),
             ListObject(emptyList()),
@@ -15,8 +16,8 @@ internal class ObjectsTest {
         )
 
         aritegObjects.forEach {
-            val hash = it.getHashString().get()
-            assertDoesNotThrow { it.verify(hash) }
+            val hash = it.getHashString()
+            assertDoesNotThrow { runBlocking { it.verify(hash) } }
         }
     }
 
@@ -59,7 +60,10 @@ internal class ObjectsTest {
 
         val treeObj = TreeObject(listOf(Link("hash", Link.Type.BLOB, 1234, "name")))
         val treeObjJson = treeObj.toJson()
-        assertEquals("{\"content\":[{\"hash\":\"hash\",\"type\":\"BLOB\",\"size\":1234,\"name\":\"name\"}]}", treeObjJson)
+        assertEquals(
+            "{\"content\":[{\"hash\":\"hash\",\"type\":\"BLOB\",\"size\":1234,\"name\":\"name\"}]}",
+            treeObjJson
+        )
         val treeObjDes = TreeObject.fromJson(treeObjJson)
         assertEquals(treeObj, treeObjDes)
 

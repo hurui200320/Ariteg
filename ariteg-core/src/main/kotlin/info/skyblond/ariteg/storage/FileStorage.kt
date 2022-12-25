@@ -1,8 +1,9 @@
 package info.skyblond.ariteg.storage
 
 import mu.KotlinLogging
-import org.apache.commons.io.FileUtils
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 
 
 class FileStorage(
@@ -32,18 +33,20 @@ class FileStorage(
         if (path.exists()) {
             throw ObjectAlreadyExistsException()
         }
-        FileUtils.openOutputStream(path).use {
+        Files.newOutputStream(path.toPath(), StandardOpenOption.CREATE).use {
             it.write(data)
         }
     }
 
     override fun internalRead(path: File): ByteArray {
-        return FileUtils.readFileToByteArray(path)
+        return Files.readAllBytes(path.toPath())
     }
 
     override fun internalDelete(path: File) {
-        if (!FileUtils.deleteQuietly(path)) {
-            logger.warn { "Failed to delete ${path.canonicalPath}" }
+        try {
+            Files.delete(path.toPath())
+        } catch (t: Throwable) {
+            logger.warn(t) { "Failed to delete ${path.canonicalPath}" }
         }
     }
 

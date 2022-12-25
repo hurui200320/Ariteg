@@ -17,7 +17,7 @@ class StatusCommand : CliktCommand(
     help = "Perform a full object scan and show some status"
 ), CoroutineScope {
 
-    override fun run() {
+    override fun run(): Unit = runBlocking {
         CmdContext.setLogger(KotlinLogging.logger("Status"))
 
         val entries = Operations.listEntry(CmdContext.storage)
@@ -30,7 +30,7 @@ class StatusCommand : CliktCommand(
         val jobCounter = AtomicLong(0)
 
         CmdContext.logger.info { "Scanning objects, this make takes a lot of time and I/O ops...." }
-        val listObjFuture = CmdContext.storage.listObjects()
+        val listObjFuture = async { CmdContext.storage.listObjects() }
 
         val linkChannel = Channel<Link>(Int.MAX_VALUE)
         // create workers
@@ -38,7 +38,7 @@ class StatusCommand : CliktCommand(
             launch {
                 for (link in linkChannel) {
                     // read the link
-                    val objFuture = CmdContext.storage.read(link)
+                    val objFuture = async { CmdContext.storage.read(link) }
                     // update counter
                     var shouldCountPureSize = false
                     when (link.type) {
@@ -52,7 +52,7 @@ class StatusCommand : CliktCommand(
                     }
                     // get the result and handle sub links
                     val obj = withContext(Dispatchers.IO) {
-                        objFuture.get()
+                        objFuture.await()
                     }
                     when (link.type) {
                         Link.Type.BLOB -> emptyList<Link>()
@@ -75,30 +75,28 @@ class StatusCommand : CliktCommand(
             }
         }
 
-        runBlocking {
-            entries.forEach { entry ->
-                jobCounter.incrementAndGet()
-                linkChannel.send(entry.link)
-            }
-            loop@ while (jobCounter.get() != 0L) {
-                CmdContext.logger.info { "Remain links: ${jobCounter.get()}" }
-                // print every 2min, but check each second
-                for (i in 1..120) {
-                    delay(1000)
-                    if (jobCounter.get() == 0L)
-                        break@loop
-                }
-            }
-            // close channel, so workers can exit
-            linkChannel.close()
+        entries.forEach { entry ->
+            jobCounter.incrementAndGet()
+            linkChannel.send(entry.link)
         }
+        loop@ while (jobCounter.get() != 0L) {
+            CmdContext.logger.info { "Remain links: ${jobCounter.get()}" }
+            // print every 2min, but check each second
+            for (i in 1..120) {
+                delay(1000)
+                if (jobCounter.get() == 0L)
+                    break@loop
+            }
+        }
+        // close channel, so workers can exit
+        linkChannel.close()
         CmdContext.logger.info { "Analyzing result..." }
-        val (blobSet, listSet, treeSet) = listObjFuture.get()
+        val (blobSet, listSet, treeSet) = listObjFuture.await()
 
         // print the result
         CmdContext.logger.info {
             "\n-------------------- Status --------------------\n" +
-                    "Total entries: ${entries.size}\n\n" +
+                    "Total entries: ${entries.count()}\n\n" +
                     "Type: Total/Unused/Reused\n" +
                     "Blobs: ${blobSet.size}/${blobSet.size - blobs.size}/${blobs.count { it.value > 1 }}\n" +
                     "Lists: ${listSet.size}/${listSet.size - lists.size}/${lists.count { it.value > 1 }}\n" +

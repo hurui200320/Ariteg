@@ -155,7 +155,7 @@ class AritegFS(
             // root folder
             fillDirFiller(
                 path, buf, filler,
-                CmdContext.storage.listEntry().map { mapEntryToFileName(it) }
+                CmdContext.storage.listEntry().map { mapEntryToFileName(it) }.toList()
             )
         } else {
             // everything else

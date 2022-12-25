@@ -6,6 +6,7 @@ import io.minio.MinioClient
 import io.minio.RemoveBucketArgs
 import io.minio.RemoveObjectArgs
 import io.minio.errors.ErrorResponseException
+import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.junit.jupiter.api.*
 import java.util.*
@@ -65,63 +66,60 @@ internal class MinioStorageTest {
     }
 
     @Test
-    fun testBlob() {
+    fun testBlob() = runBlocking {
         val blob = Blob(Random.nextBytes(64))
-        val link = minioStorage.write(Link.Type.BLOB, blob).get()
+        val link = minioStorage.write(Link.Type.BLOB, blob)
         assertEquals(64, link.size)
-        val blobR = minioStorage.read(link).get() as Blob
+        val blobR = minioStorage.read(link) as Blob
         assertEquals(blob, blobR)
-        minioStorage.delete(link).get()
-        assertThrows<ExecutionException> {
-            minioStorage.read(link).get()
+        minioStorage.delete(link)
+        assertThrows<ErrorResponseException> {
+            runBlocking { minioStorage.read(link) }
         }.also {
-            assertTrue { it.cause is ErrorResponseException }
-            assertEquals("NoSuchKey", (it.cause as ErrorResponseException).errorResponse().code())
+            assertEquals("NoSuchKey", it.errorResponse().code())
         }
 
         assertDoesNotThrow {
-            minioStorage.delete(link)
+            runBlocking { minioStorage.delete(link) }
         }
     }
 
     @Test
-    fun testList() {
+    fun testList(): Unit = runBlocking {
         val list = ListObject(listOf(Link("something", Link.Type.BLOB, -1)))
-        val link = minioStorage.write(Link.Type.LIST, list).get()
-        val listR = minioStorage.read(link).get() as ListObject
+        val link = minioStorage.write(Link.Type.LIST, list)
+        val listR = minioStorage.read(link) as ListObject
         assertEquals(list, listR)
-        minioStorage.delete(link).get()
-        assertThrows<ExecutionException> {
-            minioStorage.read(link).get()
+        minioStorage.delete(link)
+        assertThrows<ErrorResponseException> {
+            runBlocking { minioStorage.read(link) }
         }.also {
-            assertTrue { it.cause is ErrorResponseException }
-            assertEquals("NoSuchKey", (it.cause as ErrorResponseException).errorResponse().code())
+            assertEquals("NoSuchKey", it.errorResponse().code())
         }
     }
 
     @Test
-    fun testTree() {
+    fun testTree(): Unit = runBlocking {
         val tree = TreeObject(listOf(Link("something", Link.Type.BLOB, -1, "name")))
-        val link = minioStorage.write(Link.Type.TREE, tree).get()
-        val treeR = minioStorage.read(link).get() as TreeObject
+        val link = minioStorage.write(Link.Type.TREE, tree)
+        val treeR = minioStorage.read(link) as TreeObject
         assertEquals(tree, treeR)
-        minioStorage.delete(link).get()
-        assertThrows<ExecutionException> {
-            minioStorage.read(link).get()
+        minioStorage.delete(link)
+        assertThrows<ErrorResponseException> {
+            runBlocking { minioStorage.read(link) }
         }.also {
-            assertTrue { it.cause is ErrorResponseException }
-            assertEquals("NoSuchKey", (it.cause as ErrorResponseException).errorResponse().code())
+            assertEquals("NoSuchKey", it.errorResponse().code())
         }
     }
 
     @Test
-    fun listObjects() {
-        val blobs = (0..10).map { minioStorage.write(Link.Type.BLOB, Blob(Random.nextBytes(32))).get() }
-        val lists = (0..7).map { minioStorage.write(Link.Type.LIST, ListObject(listOf(blobs[it]))).get() }
+    fun listObjects(): Unit = runBlocking {
+        val blobs = (0..10).map { minioStorage.write(Link.Type.BLOB, Blob(Random.nextBytes(32))) }
+        val lists = (0..7).map { minioStorage.write(Link.Type.LIST, ListObject(listOf(blobs[it]))) }
         val trees =
-            (0..3).map { minioStorage.write(Link.Type.TREE, TreeObject(listOf(lists[it].copy(name = "name")))).get() }
+            (0..3).map { minioStorage.write(Link.Type.TREE, TreeObject(listOf(lists[it].copy(name = "name")))) }
 
-        val (b, l, t) = minioStorage.listObjects().get()
+        val (b, l, t) = minioStorage.listObjects()
         assertEquals(blobs.size, b.size)
         assertEquals(lists.size, l.size)
         assertEquals(trees.size, t.size)
@@ -132,18 +130,18 @@ internal class MinioStorageTest {
     }
 
     @Test
-    fun testEntry() {
+    fun testEntry() = runBlocking {
         val entry = Entry("name", Link("hash", Link.Type.BLOB, -1), Date())
-        minioStorage.addEntry(entry).get()
+        minioStorage.addEntry(entry)
 
         assertEquals(1, minioStorage.listEntry().count())
 
-        minioStorage.removeEntry(entry.id).get()
+        minioStorage.removeEntry(entry.id)
 
         assertEquals(0, minioStorage.listEntry().count())
 
         assertDoesNotThrow {
-            minioStorage.removeEntry(entry.id).get()
+            runBlocking { minioStorage.removeEntry(entry.id) }
         }
     }
 }

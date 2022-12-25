@@ -1,11 +1,14 @@
 package info.skyblond.ariteg.cmd
 
 import info.skyblond.ariteg.Entry
+import info.skyblond.ariteg.Link
 import info.skyblond.ariteg.Operations
 import info.skyblond.ariteg.storage.Storage
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import mu.KLogger
 import java.io.File
-import java.util.concurrent.CompletableFuture
 
 object CmdContext {
     @JvmStatic
@@ -18,8 +21,8 @@ object CmdContext {
 
     @JvmStatic
     @Suppress("MemberVisibilityCanBePrivate")
-    val slicerProvider
-        get() = getSlicerProvider()
+    val slicer
+        get() = getSlicer()
 
     @JvmStatic
     fun setStorage(storage: Storage) {
@@ -31,13 +34,24 @@ object CmdContext {
     }
 
     @JvmStatic
-    fun download(id: String, rootFolder: File) {
+    fun download(ids: List<String>, rootFolder: File) {
         logger.info { "Finding entry..." }
-        val entry = Operations.listEntry(storage)
-            .find { it.id == id } ?: error("Entry not found")
-        logger.info { "Start downloading..." }
-        Operations.restore(entry, storage, rootFolder)
-        logger.info { "Done" }
+        val downloaded = mutableSetOf<String>()
+        runBlocking {
+            Operations.listEntry(storage)
+                .forEach {
+                    if (it.id in ids) {
+                        logger.info { "Start downloading ${it.id}..." }
+                        Operations.restore(it, storage, rootFolder)
+                        logger.info { "Done" }
+                        downloaded.add(it.id)
+                    }
+                }
+        }
+        val notFound = (ids - downloaded)
+        if (notFound.isNotEmpty()) {
+            error("Entry not found: $notFound")
+        }
     }
 
     @JvmStatic
@@ -55,7 +69,7 @@ object CmdContext {
     }
 
     @JvmStatic
-    fun listEntry(): List<Entry> {
+    fun listEntry(): Sequence<Entry> {
         return Operations.listEntry(storage)
     }
 
@@ -75,13 +89,15 @@ object CmdContext {
 
     @JvmStatic
     fun upload(files: List<File>) {
-        files.map { file ->
-            logger.info { "Uploading ${file.canonicalPath}" }
-            val entry = Operations.digest(file, slicerProvider, storage)
-            logger.info { "Finished ${entry.name}" }
-            entry
-        }.forEach { entry ->
-            entry.printDetails()
+        runBlocking {
+            files.map { file ->
+                logger.info { "Uploading ${file.canonicalPath}" }
+                val entry = Operations.digest(file, slicer, storage)
+                logger.info { "Finished ${entry.name}" }
+                entry
+            }.forEach { entry ->
+                entry.printDetails()
+            }
         }
 
         logger.info { "Done" }
@@ -94,21 +110,28 @@ object CmdContext {
             if (ids.isNotEmpty() && entry.id !in ids) {
                 return@forEach
             }
-            logger.info { "Verifying entry: ${entry.id} (${entry.name})" }
-            val blobs = Operations.resolve(entry, storage)
-            logger.info { "Verifying ${blobs.size / 1000.0}K blobs..." }
-            val semaphore = Operations.getLimitingSemaphore()
-            blobs.map {
-                CompletableFuture.runAsync {
-                    semaphore.acquire()
-                    storage.read(it)
-                }.exceptionally { semaphore.release(); throw it }
-                    .thenRun { semaphore.release() }
-            }.forEachIndexed { index, completableFuture ->
-                completableFuture.get()
-                if (index % 1000 == 0) {
-                    logger.info { "${index / 1000}K blobs are checked" }
+            runBlocking {
+                logger.info { "Verifying entry: ${entry.id} (${entry.name})" }
+                val blobs = Operations.resolve(entry, storage)
+                logger.info { "Verifying ${blobs.size / 1000.0}K blobs..." }
+
+                val taskChannel = Channel<Pair<Int, Link>>(Channel.UNLIMITED)
+
+                repeat(Runtime.getRuntime().availableProcessors() * 2) {
+                    launch {
+                        for (task in taskChannel) {
+                            storage.read(task.second)
+                            if (task.first % 1000 == 0) {
+                                logger.info { "${task.first / 1000}K blobs are checked" }
+                            }
+                        }
+                    }
                 }
+
+                blobs.forEachIndexed { index, link ->
+                    taskChannel.send(index to link)
+                }
+                taskChannel.close()
             }
         }
         logger.info { "Done" }
