@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("java")
-    kotlin("jvm") version "1.7.20"
+    kotlin("jvm") version "1.7.21"
     id("maven-publish")
 }
 
@@ -27,7 +27,7 @@ allprojects {
         implementation("ch.qos.logback:logback-classic:1.4.5")
         // test
         testImplementation(kotlin("test"))
-        testImplementation("org.mockito:mockito-core:4.9.0")
+        testImplementation("org.mockito:mockito-core:4.10.0")
     }
 
     tasks.test {
