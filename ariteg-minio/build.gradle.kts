@@ -8,7 +8,7 @@ description = "Minio storage extension for ariteg"
 
 dependencies {
     // minio sdk, export this dep
-    api(libs.minio.sdk)
+    api("io.minio:minio:8.4.6")
     // ariteg-core
     implementation(project(":ariteg-core"))
 }

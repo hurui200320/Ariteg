@@ -13,6 +13,9 @@ dependencies {
     implementation(libs.multihash.java)
     // json & yaml operation
     implementation(libs.jackson.kotlin)
+    // kotlin coroutines
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+
     // commons-io
-    implementation(libs.commons.io)
+    testImplementation(libs.commons.io)
 }

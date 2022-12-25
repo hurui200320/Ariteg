@@ -19,8 +19,6 @@ application {
 dependencies {
     // clikt
     implementation(libs.clikt)
-    // oracle nashorn
-    implementation(libs.nashorn)
     // commons-io
     implementation(libs.commons.io)
     // ariteg-core
@@ -31,6 +29,4 @@ dependencies {
     implementation(libs.fnr.fuse)
     // caffeine
     implementation(libs.caffeine)
-    // kotlin coroutines
-    implementation(libs.kotlinx.coroutine)
 }
