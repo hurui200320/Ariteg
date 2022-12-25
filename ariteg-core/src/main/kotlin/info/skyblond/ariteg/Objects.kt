@@ -2,25 +2,23 @@ package info.skyblond.ariteg
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.annotation.JsonPropertyOrder
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.util.StdDateFormat
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import java.util.*
-import java.util.concurrent.CompletableFuture
 import kotlin.math.absoluteValue
+
+class HashNotMatchException(
+    expected: String, real: String,
+) : RuntimeException("expected hash: $expected, got: $real")
 
 interface AritegObject {
     @JsonIgnore
-    fun getHashString(): CompletableFuture<String>
-
-    class HashNotMatchException(
-        expected: String, real: String,
-    ) : RuntimeException("expected hash: $expected, got: $real")
+    fun getHashString(): String
 
     fun verify(hash: String) {
-        val realHash = getHashString().get()
+        val realHash = getHashString()
         if (realHash != hash) {
             throw HashNotMatchException(hash, realHash)
         }
@@ -30,13 +28,11 @@ interface AritegObject {
 }
 
 abstract class AbstractAritegObject : AritegObject {
-    protected fun calculateHash(data: ByteArray): CompletableFuture<String> = CompletableFuture.supplyAsync {
-        val hash1 = CompletableFuture.supplyAsync { calculateHash1(data) }
-        val hash2 = CompletableFuture.supplyAsync { calculateHash2(data) }
-        hash1.get().toBase58() + "," + hash2.get().toBase58()
-    }
+    protected fun calculateHash(data: ByteArray): String =
+        calculateHash1(data).toBase58() + "," + calculateHash2(data).toBase58()
 
-    override fun getHashString(): CompletableFuture<String> = calculateHash(encodeToBytes())
+    // TODO: Make this final
+    override fun getHashString(): String = calculateHash(encodeToBytes())
 }
 
 data class Blob(val data: ByteArray) : AbstractAritegObject() {
@@ -132,7 +128,8 @@ data class TreeObject(
         fun fromJson(json: String): TreeObject = objectMapper.readValue(json)
     }
 
-    override fun getHashString(): CompletableFuture<String> = calculateHash(toString().encodeToByteArray())
+    // TODO: Remove this. A breaking change.
+    override fun getHashString(): String = calculateHash(toString().encodeToByteArray())
 }
 
 data class Entry(

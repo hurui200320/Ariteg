@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import info.skyblond.ariteg.*
 import info.skyblond.ariteg.cmd.CmdContext
+import kotlinx.coroutines.runBlocking
 import java.io.FileNotFoundException
 import java.math.BigInteger
 import java.util.concurrent.ExecutionException
@@ -34,7 +35,7 @@ object RandomAccessCache {
         // here might be multiple thread reading one blob, introducing lock will make
         // things complicated. Thus, we (I) can tolerate that.
         return try {
-            val blob = CmdContext.storage.read(link).get() as Blob
+            val blob = runBlocking { CmdContext.storage.read(link) as Blob }
             blobContentCache.put(link.hash, blob.data)
             blob
         } catch (t: Throwable) {
@@ -60,7 +61,7 @@ object RandomAccessCache {
         listCache.getIfPresent(link.hash)?.let { return it }
         // not found, read it
         return try {
-            val list = CmdContext.storage.read(link).get() as ListObject
+            val list = runBlocking { CmdContext.storage.read(link) as ListObject }
             listCache.put(link.hash, list)
             list
         } catch (t: Throwable) {
@@ -79,7 +80,7 @@ object RandomAccessCache {
         treeCache.getIfPresent(link.hash)?.let { return it }
         // not found, read it
         return try {
-            val tree = CmdContext.storage.read(link).get() as TreeObject
+            val tree = runBlocking { CmdContext.storage.read(link) as TreeObject }
             treeCache.put(link.hash, tree)
             tree
         } catch (t: Throwable) {
@@ -103,7 +104,7 @@ object RandomAccessCache {
         entryCache.getIfPresent(id)?.let { return it }
         // not found, read it
         return try {
-            val entry = CmdContext.storage.getEntry(id).get()
+            val entry = runBlocking { CmdContext.storage.getEntry(id) }
             entryCache.put(id, entry)
             entry
         } catch (t: ExecutionException) {
