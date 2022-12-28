@@ -1,12 +1,10 @@
-import kotlin.collections.listOf
-
 plugins {
     kotlin("jvm")
     application
 }
 
 group = "info.skyblond.ariteg"
-version = VersionUtils.getVersion()
+version = rootProject.version as String
 description = "CLI for ariteg"
 
 
@@ -17,16 +15,16 @@ application {
 }
 
 dependencies {
+    implementation(project(":ariteg-core"))
+    implementation(project(":storage-core"))
+    implementation(project(":storage-file"))
+    implementation(project(":storage-minio"))
     // clikt
-    implementation(libs.clikt)
+    implementation("com.github.ajalt.clikt:clikt:3.5.0")
+    // jnr-fuse
+    implementation("com.github.serceman:jnr-fuse:0.5.7")
+    // caffeine
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.2")
     // commons-io
     implementation(libs.commons.io)
-    // ariteg-core
-    implementation(project(":ariteg-core"))
-    // ariteg-minio
-    implementation(project(":ariteg-minio"))
-    // jnr-fuse
-    implementation(libs.fnr.fuse)
-    // caffeine
-    implementation(libs.caffeine)
 }

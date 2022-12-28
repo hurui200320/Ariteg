@@ -1,6 +1,8 @@
 package info.skyblond.ariteg
 
 import info.skyblond.ariteg.storage.Storage
+import info.skyblond.ariteg.storage.obj.Entry
+import info.skyblond.ariteg.storage.obj.Link
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -23,7 +25,7 @@ class OperationsMockTest {
     @Test
     fun testResolve(): Unit = runBlocking {
         val link = Link("Something", Link.Type.BLOB, -1)
-        `when`(storage.resolve(link)).thenReturn(emptySet())
+        `when`(storage.resolve(link)).thenReturn(emptySequence())
         Operations.resolve(Entry("name", link, Date()), storage)
         verify(storage, times(1)).resolve(link)
     }

@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "info.skyblond.ariteg"
-version = VersionUtils.getVersion()
+version = "1.0.0"
 description = "Root project of ariteg"
 
 allprojects {
@@ -66,7 +66,7 @@ subprojects {
         publications {
             create<MavenPublication>("maven") {
                 groupId = "info.skyblond.ariteg"
-                version = VersionUtils.getVersion()
+                version = rootProject.version as String
                 artifactId = project.name
                 from(components["java"])
                 pom {

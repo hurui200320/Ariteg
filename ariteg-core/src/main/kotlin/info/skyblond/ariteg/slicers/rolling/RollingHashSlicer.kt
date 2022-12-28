@@ -1,7 +1,7 @@
 package info.skyblond.ariteg.slicers.rolling
 
-import info.skyblond.ariteg.Blob
 import info.skyblond.ariteg.slicers.Slicer
+import info.skyblond.ariteg.storage.obj.Blob
 import java.io.InputStream
 
 abstract class RollingHashSlicer(

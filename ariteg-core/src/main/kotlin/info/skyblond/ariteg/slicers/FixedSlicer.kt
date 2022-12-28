@@ -1,6 +1,6 @@
 package info.skyblond.ariteg.slicers
 
-import info.skyblond.ariteg.Blob
+import info.skyblond.ariteg.storage.obj.Blob
 import java.io.InputStream
 
 /**

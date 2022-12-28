@@ -1,7 +1,5 @@
 package info.skyblond.ariteg.slicers.rolling
 
-import java.io.File
-
 class RabinKarpSlicer(
     targetFingerprint: UInt,
     fingerprintMask: UInt,

@@ -3,6 +3,7 @@ package info.skyblond.ariteg
 import info.skyblond.ariteg.slicers.FixedSlicer
 import info.skyblond.ariteg.slicers.Slicer
 import info.skyblond.ariteg.storage.FileStorage
+import info.skyblond.ariteg.storage.obj.Link
 import kotlinx.coroutines.runBlocking
 import org.apache.commons.io.FileUtils
 import org.junit.jupiter.api.AfterEach
@@ -100,7 +101,9 @@ internal class OperationsTest {
         // make sure unused things are deleted
         val root = prepareTestRootFolder()
         val entry = Operations.digest(root, slicer, storage)
-        val (b, l, t) = storage.listObjects()
+        val b = storage.listObjects(Link.Type.BLOB).toList()
+        val l = storage.listObjects(Link.Type.LIST).toList()
+        val t = storage.listObjects(Link.Type.TREE).toList()
 
         val root2 = prepareTestRootFolder()
         val entry2 = Operations.digest(root2, slicer, storage)
@@ -118,7 +121,10 @@ internal class OperationsTest {
 
         Operations.gc(storage)
 
-        val (b1, l1, t1) = storage.listObjects()
+
+        val b1 = storage.listObjects(Link.Type.BLOB).toList()
+        val l1 = storage.listObjects(Link.Type.LIST).toList()
+        val t1 = storage.listObjects(Link.Type.TREE).toList()
         assertEquals(b, b1)
         assertEquals(l, l1)
         assertEquals(t, t1)
