@@ -2,9 +2,10 @@ package info.skyblond.ariteg.cmd.fuse
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
-import info.skyblond.ariteg.*
 import info.skyblond.ariteg.cmd.CmdContext
+import info.skyblond.ariteg.storage.obj.*
 import kotlinx.coroutines.runBlocking
+import mu.KotlinLogging
 import java.io.FileNotFoundException
 import java.math.BigInteger
 import java.util.concurrent.ExecutionException
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit
  * This object holds the caches for random access needs.
  * */
 object RandomAccessCache {
+    private val logger = KotlinLogging.logger {  }
     // ------------------------------ BLOB cache ------------------------------
     /**
      * The blobs are immutable, but caching them cost a lot of RAM.
@@ -39,7 +41,7 @@ object RandomAccessCache {
             blobContentCache.put(link.hash, blob.data)
             blob
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to read $link" }
+            logger.error(t) { "Failed to read $link" }
             null
         }
     }
@@ -55,7 +57,7 @@ object RandomAccessCache {
         .softValues()
         .build()
 
-    fun getCachedList(link: Link): ListObject? {
+    private fun getCachedList(link: Link): ListObject? {
         if (link.type != Link.Type.LIST) return null
         // return if found
         listCache.getIfPresent(link.hash)?.let { return it }
@@ -65,7 +67,7 @@ object RandomAccessCache {
             listCache.put(link.hash, list)
             list
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to read $link" }
+            logger.error(t) { "Failed to read $link" }
             null
         }
     }
@@ -84,7 +86,7 @@ object RandomAccessCache {
             treeCache.put(link.hash, tree)
             tree
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to read $link" }
+            logger.error(t) { "Failed to read $link" }
             null
         }
     }
@@ -99,20 +101,20 @@ object RandomAccessCache {
         .softValues()
         .build()
 
-    fun getCachedEntry(id: String): Entry? {
+    fun getCachedEntry(name: String): Entry? {
         // return if found
-        entryCache.getIfPresent(id)?.let { return it }
+        entryCache.getIfPresent(name)?.let { return it }
         // not found, read it
         return try {
-            val entry = runBlocking { CmdContext.storage.getEntry(id) }
-            entryCache.put(id, entry)
+            val entry = runBlocking { CmdContext.storage.getEntry(name) }
+            entryCache.put(name, entry)
             entry
         } catch (t: ExecutionException) {
             if (t.cause !is FileNotFoundException)
-                CmdContext.logger.error(t) { "Failed to read entry $id" }
+                logger.error(t) { "Failed to read entry $name" }
             null
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to read entry $id" }
+            logger.error(t) { "Failed to read entry $name" }
             null
         }
     }
@@ -164,7 +166,7 @@ object RandomAccessCache {
             blobIndexCache.put(link.hash, result)
             result
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to build index for $link" }
+            logger.error(t) { "Failed to build index for $link" }
             null
         }
     }
@@ -195,7 +197,7 @@ object RandomAccessCache {
                 ?.sumOf { it } ?: BigInteger.ZERO
 
             Link.Type.TREE -> getCachedTree(link)?.content
-                ?.map { calculateFileSize(it) }
+                ?.map { calculateFileSize(it.value) }
                 ?.sumOf { it } ?: BigInteger.ZERO
         }
     }

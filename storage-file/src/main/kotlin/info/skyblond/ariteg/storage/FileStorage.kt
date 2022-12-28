@@ -10,6 +10,7 @@ import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.StandardOpenOption
 import java.util.*
+import kotlin.math.absoluteValue
 
 
 class FileStorage(
@@ -33,14 +34,20 @@ class FileStorage(
         // divide into sub folders to ease the small file performance issue
         val typeDir = File(baseDir, type.lowercase()).also { it.mkdirs() }
         return if (type != "entry") {
-            val slice = name.chunked(5)
-            val parent = File(typeDir, slice.dropLast(1).joinToString(File.separator))
+            // here we try to reduce fs load by grouping things into folders
+            // the idea is : zzz/xxx/yyy/abc...xxxyyyzzz.dat
+            // to prevent the path become too long, we only take 5 levels
+            // and to hard limit the sub folders amount, round with 100k
+            val slice = name.chunked(11).reversed().take(5)
+                .map { it.hashCode().absoluteValue % 100_000 }
+            // to shorten the path, use HEX
+            val parent = File(typeDir, slice.joinToString(File.separator) { it.toString(16) })
             while (true) {
                 parent.mkdirs()
                 if (parent.exists()) break
                 logger.warn { "Waiting for ${parent.canonicalPath}" }
             }
-            File(parent, slice.last() + ".dat")
+            File(parent, "$name.dat")
         } else {
             File(typeDir, "$name.dat")
         }
@@ -74,13 +81,7 @@ class FileStorage(
                 if (it.isDirectory) {
                     queue.add(it)
                 } else if (it.isFile && it.extension == "dat") {
-                    val fullPath = it.canonicalPath
-                    // remove base path and `,dat` suffix
-                    val cleaned = fullPath
-                        .drop(basePath.length + type.name.length + 2)
-                        .dropLast(4)
-                        .replace(File.separator, "")
-                    yield(Link(cleaned, type, -1))
+                    yield(Link(it.nameWithoutExtension, type, -1))
                 }
             }
         }

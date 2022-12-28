@@ -6,12 +6,13 @@ import info.skyblond.ariteg.storage.Storage
 import info.skyblond.ariteg.storage.obj.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.toList
+import kotlinx.coroutines.sync.Semaphore
 import mu.KotlinLogging
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import java.util.*
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
 object Operations {
@@ -20,13 +21,6 @@ object Operations {
     private fun format(number: Double): String {
         return "%.2f".format(number)
     }
-
-    /**
-     * Return how many memory we can use
-     * */
-    private fun getFreeMemory(): Long = Runtime.getRuntime().freeMemory()
-
-    private fun getMemoryLowWaterMark(): Long = 32L * MEGA_BYTE
 
     /**
      * Digest the [root] file, slice it and save as an [Entry]
@@ -51,19 +45,19 @@ object Operations {
                 logger.info { "Slicing chunks: ${file.canonicalPath}" }
                 var processedSize = 0L
                 var lastTime = 0L
+                // use semaphore to limit the memory usage
+                val s = Semaphore(Runtime.getRuntime().availableProcessors() * 2)
 
                 withContext(Dispatchers.IO) {
                     Files.newInputStream(file.toPath(), StandardOpenOption.READ)
                 }.use { fis ->
                     slicer.slice(fis).forEach { nextBlob ->
-                        // do not use too many ram
-                        while (getFreeMemory() <= getMemoryLowWaterMark()) {
-                            logger.warn { "Waiting for writing..." }
-                            delay(1000) // wait 1s
-                            System.gc()
-                        }
                         processedSize += nextBlob.data.size
-                        futureLinks.add(async { storage.write(Link.Type.BLOB, nextBlob) })
+                        futureLinks.add(async {
+                            s.acquire()
+                            storage.write(Link.Type.BLOB, nextBlob)
+                                .also { s.release() }
+                        })
                         // print processing info
                         if (System.currentTimeMillis() - lastTime >= 1000) {
                             logger.info {
@@ -145,7 +139,7 @@ object Operations {
         internalRestore(entry.root, storage, File(root, entry.name))
     }
 
-    private suspend fun internalRestore(link: Link, storage: Storage, root: File) {
+    private suspend fun internalRestore(link: Link, storage: Storage, root: File): Unit = coroutineScope {
         logger.info { "Restoring ${root.canonicalPath}" }
         when (link.type) {
             Link.Type.BLOB -> {
@@ -190,9 +184,10 @@ object Operations {
                 } else {
                     check(root.mkdirs()) { "Failed to create root folder: ${root.canonicalPath}" }
                 }
-                for (e in treeObj.content) {
-                    internalRestore(e.value, storage, File(root, e.key))
-                }
+                // parallel restore for tree
+                treeObj.content.map { e ->
+                    async { internalRestore(e.value, storage, File(root, e.key)) }
+                }.forEach { it.await() }
             }
         }
     }
@@ -287,41 +282,37 @@ object Operations {
         val blobs = storage.listObjects(Link.Type.BLOB)
         logger.info { "Listed ${blobs.count()} blobs. Start checking..." }
         val brokenListChannel = Channel<Link>(Channel.UNLIMITED)
-        val brokenListFuture = async { brokenListChannel.toList() }
-        blobs.map { link ->
-            async {
-                while (getFreeMemory() <= getMemoryLowWaterMark()) {
-                    delay(1000)
-                    System.gc()
-                    logger.info { "Waiting for gc..." }
-                }
-                try {
-                    storage.read(link)
-                } catch (e: HashNotMatchException) {
-                    // exception means the hash is not correct
-                    logger.info { "Hash not match on ${link.hash}" }
-                    brokenListChannel.send(link)
+        launch {
+            var counter = 0L
+            for (link in brokenListChannel) {
+                counter += 1
+                logger.warn { "Broken ${link.type}: ${link.hash}" }
+                if (deleting) storage.delete(link)
+            }
+            logger.info { "Found $counter broken blobs." }
+        }
+        val taskChannel = Channel<Link>(Channel.UNLIMITED)
+        val taskCounter = AtomicLong(0)
+
+        repeat(Runtime.getRuntime().availableProcessors() * 2) {
+            launch {
+                for (link in taskChannel) {
+                    try {
+                        storage.read(link)
+                    } catch (e: HashNotMatchException) {
+                        // exception means the hash is not correct
+                        brokenListChannel.send(link)
+                    }
+                    taskCounter.decrementAndGet()
                 }
             }
-        }.forEachIndexed { index, deferred ->
-            deferred.await()
-            if (index % 1000 == 0) {
-                logger.info { "Checked ${index / 1000}K blobs" }
-            }
+        }
+        blobs.forEach { taskCounter.incrementAndGet(); taskChannel.send(it) }
+        taskChannel.close()
+        while (taskCounter.get() != 0L) {
+            delay(1000)
         }
         brokenListChannel.close()
-        val brokenList = brokenListFuture.await()
-
-        logger.info { "Found ${brokenList.size} broken blobs:" }
-        brokenList.forEach {
-            logger.info { "(${it.type})${it.hash}" }
-        }
-        if (deleting) {
-            logger.info { "Deleting broken blobs..." }
-            brokenList
-                .map { async { storage.delete(it) } }
-                .forEach { it.await() }
-        }
     }
 }
 

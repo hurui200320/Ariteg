@@ -3,11 +3,6 @@ package info.skyblond.ariteg.storage
 import info.skyblond.ariteg.*
 import info.skyblond.ariteg.storage.obj.*
 import kotlinx.coroutines.*
-import org.bouncycastle.crypto.engines.AESEngine
-import org.bouncycastle.crypto.modes.GCMSIVBlockCipher
-import org.bouncycastle.crypto.params.AEADParameters
-import org.bouncycastle.crypto.params.KeyParameter
-import java.security.SecureRandom
 import java.util.*
 
 abstract class AbstractStorage<PathType : Any> : Storage {
@@ -104,7 +99,7 @@ abstract class AbstractStorage<PathType : Any> : Storage {
 
         while (true) {
             val path = mapToPath("entry", resultEntry.name)
-            val data = entry.encoded
+            val data = resultEntry.encoded
             try {
                 withContext(Dispatchers.IO) { internalWrite(path, data) }
                 break
