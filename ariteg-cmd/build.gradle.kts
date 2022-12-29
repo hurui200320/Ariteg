@@ -19,6 +19,8 @@ dependencies {
     implementation(project(":storage-core"))
     implementation(project(":storage-file"))
     implementation(project(":storage-minio"))
+    // groovy scripting
+    implementation("org.apache.groovy:groovy:4.0.7")
     // clikt
     implementation("com.github.ajalt.clikt:clikt:3.5.0")
     // jnr-fuse

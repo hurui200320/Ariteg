@@ -12,7 +12,7 @@ class MainCommand : CliktCommand() {
             UploadCommand(),
             DownloadCommand(),
             RemoveEntryCommand(),
-            // TODO FindCommand?
+            FindCommand(),
             // Maintenance
             GCCommand(),
             IntegrityCheckCommand(),
