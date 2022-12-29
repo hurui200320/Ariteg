@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.time.ZonedDateTime
 import java.util.*
 import kotlin.random.Random
 import kotlin.test.assertContentEquals
@@ -155,7 +156,7 @@ internal class ObjectTest {
     @Test
     fun testEntry() {
         val entry1 = Entry(
-            "name", Link("hash", Link.Type.TREE, 123), Date()
+            "name", Link("hash", Link.Type.TREE, 123), ZonedDateTime.now()
         )
         println(entry1.encoded.decodeToString())
         val entry2 = Entry(entry1.encoded)
@@ -163,13 +164,13 @@ internal class ObjectTest {
         assertTrue(entry1.hashCode() == entry2.hashCode())
         // same name, different content
         val entry3 = Entry(
-            "name", Link("hash111", Link.Type.BLOB, 123), Date()
+            "name", Link("hash111", Link.Type.BLOB, 123), ZonedDateTime.now()
         )
         assertTrue(entry1 == entry3)
         assertTrue(entry1.hashCode() == entry3.hashCode())
         // different name, same content
         val entry4 = Entry(
-            "name111", Link("hash", Link.Type.TREE, 123), Date()
+            "name111", Link("hash", Link.Type.TREE, 123), ZonedDateTime.now()
         )
         assertTrue(entry1 != entry4)
         assertTrue(entry1.hashCode() != entry4.hashCode())

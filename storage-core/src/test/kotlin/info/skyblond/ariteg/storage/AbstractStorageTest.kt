@@ -6,7 +6,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
-import java.util.*
+import java.time.ZonedDateTime
 import kotlin.random.Random
 import kotlin.test.assertEquals
 
@@ -77,7 +77,7 @@ internal abstract class AbstractStorageTest {
 
     @Test
     fun testEntry(): Unit = runBlocking {
-        val entry = Entry("name", Link("hash", Link.Type.BLOB, -1), Date())
+        val entry = Entry("name", Link("hash", Link.Type.BLOB, -1), ZonedDateTime.now())
         storage.addEntry(entry)
         val restored = storage.getEntry(entry.name)
         assertEquals(entry.name, restored.name)

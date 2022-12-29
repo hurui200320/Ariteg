@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.apache.commons.io.FileUtils
 import org.junit.jupiter.api.*
 import java.io.File
+import java.time.ZonedDateTime
 import java.util.*
 import kotlin.random.Random
 import kotlin.test.assertEquals
@@ -39,18 +40,18 @@ internal class FileStorageTest {
 
     @Test
     fun testEntry(): Unit = runBlocking {
-        val entry = Entry("name", Link("hash", Link.Type.BLOB, -1), Date())
+        val entry = Entry("name", Link("hash", Link.Type.BLOB, -1), ZonedDateTime.now())
         fileStorage.addEntry(entry)
         val restored = fileStorage.getEntry(entry.name)
-        kotlin.test.assertEquals(entry.name, restored.name)
-        kotlin.test.assertEquals(entry.root, restored.root)
-        kotlin.test.assertEquals(entry.ctime, restored.ctime)
+        assertEquals(entry.name, restored.name)
+        assertEquals(entry.root, restored.root)
+        assertEquals(entry.ctime, restored.ctime)
 
-        kotlin.test.assertEquals(1, fileStorage.listEntry().count())
+        assertEquals(1, fileStorage.listEntry().count())
 
         fileStorage.removeEntry(entry.name)
 
-        kotlin.test.assertEquals(0, fileStorage.listEntry().count())
+        assertEquals(0, fileStorage.listEntry().count())
 
         assertDoesNotThrow {
             runBlocking { fileStorage.removeEntry(entry.name) }

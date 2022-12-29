@@ -11,6 +11,7 @@ import mu.KotlinLogging
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import java.time.ZonedDateTime
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
@@ -28,7 +29,7 @@ object Operations {
     @JvmStatic
     suspend fun digest(root: File, slicer: Slicer, storage: Storage): Entry {
         val rootLink = internalDigest(root, slicer, storage)
-        val entry = Entry(root.name, rootLink.await(), Date())
+        val entry = Entry(root.name, rootLink.await(), ZonedDateTime.now())
         logger.info { "Writing entry for ${root.canonicalPath}" }
         return storage.addEntry(entry)
     }

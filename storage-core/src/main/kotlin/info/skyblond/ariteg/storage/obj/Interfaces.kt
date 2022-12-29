@@ -1,6 +1,7 @@
 package info.skyblond.ariteg.storage.obj
 
 import info.skyblond.ariteg.storage.HashNotMatchException
+import java.time.ZonedDateTime
 import java.util.*
 
 interface Writable {
@@ -82,7 +83,7 @@ interface Entry: Writable {
     /**
      * create time.
      * */
-    val ctime: Date
+    val ctime: ZonedDateTime
 
     /**
      * Return the same entry but different name

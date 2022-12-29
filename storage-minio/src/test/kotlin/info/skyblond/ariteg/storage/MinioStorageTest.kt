@@ -8,6 +8,7 @@ import io.minio.RemoveObjectArgs
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.junit.jupiter.api.*
+import java.time.ZonedDateTime
 import java.util.*
 import kotlin.random.Random
 import kotlin.test.assertEquals
@@ -75,7 +76,7 @@ internal class MinioStorageTest {
 
     @Test
     fun testEntry(): Unit = runBlocking {
-        val entry = Entry("name", Link("hash", Link.Type.BLOB, -1), Date())
+        val entry = Entry("name", Link("hash", Link.Type.BLOB, -1), ZonedDateTime.now())
         minioStorage.addEntry(entry)
         val restored = minioStorage.getEntry(entry.name)
         assertEquals(entry.name, restored.name)

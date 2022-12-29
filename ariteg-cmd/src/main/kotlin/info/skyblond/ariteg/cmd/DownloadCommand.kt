@@ -19,13 +19,13 @@ class DownloadCommand : CliktCommand(
     help = "Download a entry from the storage"
 ) {
     private val logger = KotlinLogging.logger("Download")
-    private val id: List<String> by argument(name = "ID", help = "Entry id. Empty for all").multiple()
+    private val names: List<String> by argument(name = "Names", help = "Entry id. Empty for all").multiple()
     private val folder: File by option("-p", "--path", help = "Path to root download folder")
         .file(mustExist = false, canBeFile = false, canBeDir = true)
         .required()
 
     override fun run() {
-        val workingQueue = id.ifEmpty {
+        val workingQueue = names.ifEmpty {
             CmdContext.storage.listEntry().map { it.name }.toList()
         }
         val downloaded = mutableSetOf<String>()

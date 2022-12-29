@@ -116,7 +116,7 @@ class AritegFS(
             }
             // set time as entry
             resolveEntry(path)?.let { entry ->
-                val unixTime = entry.ctime.time / 1000
+                val unixTime = entry.ctime.toInstant().epochSecond
                 stat.st_birthtime.tv_sec.set(unixTime)
                 stat.st_mtim.tv_sec.set(unixTime)
                 stat.st_ctim.tv_sec.set(unixTime)

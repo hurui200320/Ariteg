@@ -7,6 +7,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
+import java.time.ZonedDateTime
 import java.util.*
 
 /**
@@ -26,7 +27,7 @@ class OperationsMockTest {
     fun testResolve(): Unit = runBlocking {
         val link = Link("Something", Link.Type.BLOB, -1)
         `when`(storage.resolve(link)).thenReturn(emptySequence())
-        Operations.resolve(Entry("name", link, Date()), storage)
+        Operations.resolve(Entry("name", link, ZonedDateTime.now()), storage)
         verify(storage, times(1)).resolve(link)
     }
 }

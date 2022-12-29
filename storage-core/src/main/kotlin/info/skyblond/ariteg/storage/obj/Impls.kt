@@ -4,6 +4,7 @@ import com.dampcake.bencode.Bencode
 import info.skyblond.ariteg.storage.HashNotMatchException
 import io.ipfs.multihash.Multihash
 import org.bouncycastle.crypto.digests.SHA3Digest
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 
@@ -117,7 +118,7 @@ internal data class TreeImpl(
 }
 
 internal data class EntryImpl(
-    override val name: String, override val root: Link, override val ctime: Date
+    override val name: String, override val root: Link, override val ctime: ZonedDateTime
 ) : Entry {
     override fun withName(newName: String): Entry = this.copy(name = newName)
     override fun equals(other: Any?): Boolean {
@@ -139,7 +140,7 @@ internal data class EntryImpl(
             mapOf(
                 "name" to name,
                 "root" to root.encodedString(),
-                "ctime" to DateTimeFormatter.ISO_INSTANT.format(ctime.toInstant())
+                "ctime" to DateTimeFormatter.ISO_DATE_TIME.format(ctime)
             )
         )
     }

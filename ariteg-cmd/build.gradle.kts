@@ -10,7 +10,7 @@ description = "CLI for ariteg"
 
 application {
     mainClass.set("info.skyblond.ariteg.cmd.MainCommandKt")
-    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8")
+//    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8")
     executableDir = ""
 }
 

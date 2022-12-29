@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import info.skyblond.ariteg.Operations
 import info.skyblond.ariteg.cmd.fuse.RandomAccessCache
 import info.skyblond.ariteg.storage.obj.Link
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 class ListEntryCommand : CliktCommand(
@@ -25,7 +26,11 @@ class ListEntryCommand : CliktCommand(
             // print raw size
             print(RandomAccessCache.calculateFileSize(it.root).toString() + " ")
             // print date
-            print(DateTimeFormatter.ISO_INSTANT.format(it.ctime.toInstant()) + " ")
+            print( // here print the local time
+                DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
+                    it.ctime.withZoneSameInstant(ZoneId.systemDefault())
+                ) + " "
+            )
             // print name
             println(it.name)
         }

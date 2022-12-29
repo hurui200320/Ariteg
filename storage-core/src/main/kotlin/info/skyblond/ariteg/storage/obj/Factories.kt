@@ -3,6 +3,7 @@ package info.skyblond.ariteg.storage.obj
 import com.dampcake.bencode.Bencode
 import com.dampcake.bencode.Type
 import java.time.Instant
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 
@@ -38,13 +39,13 @@ fun TreeObject(data: ByteArray): TreeObject {
     return TreeImpl(content)
 }
 
-fun Entry(name: String, root: Link, ctime: Date): Entry = EntryImpl(name, root, ctime)
+fun Entry(name: String, root: Link, ctime: ZonedDateTime): Entry = EntryImpl(name, root, ctime)
 fun Entry(data: ByteArray): Entry {
     val bencode = Bencode(Charsets.UTF_8)
     val map = bencode.decode(data, Type.DICTIONARY)
     return EntryImpl(
         name = map["name"] as String,
         root = Link(map["root"] as String),
-        ctime = Date.from(Instant.from(DateTimeFormatter.ISO_INSTANT.parse(map["ctime"] as String)))
+        ctime = ZonedDateTime.from(DateTimeFormatter.ISO_DATE_TIME.parse(map["ctime"] as String))
     )
 }
