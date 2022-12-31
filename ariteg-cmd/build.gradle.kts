@@ -19,6 +19,8 @@ dependencies {
     implementation(project(":storage-core"))
     implementation(project(":storage-file"))
     implementation(project(":storage-minio"))
+    // logback
+    implementation("ch.qos.logback:logback-classic:1.4.5")
     // groovy scripting
     implementation("org.apache.groovy:groovy:4.0.7")
     // clikt

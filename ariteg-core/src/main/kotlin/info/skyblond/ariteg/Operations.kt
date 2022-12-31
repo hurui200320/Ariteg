@@ -6,7 +6,6 @@ import info.skyblond.ariteg.storage.Storage
 import info.skyblond.ariteg.storage.obj.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.sync.Semaphore
 import mu.KotlinLogging
 import java.io.File
 import java.nio.file.Files
@@ -21,6 +20,20 @@ object Operations {
     private const val MEGA_BYTE = 1024 * 1024
     private fun format(number: Double): String {
         return "%.2f".format(number)
+    }
+
+    suspend fun waitForMemory() {
+        // make sure we always have 32MB free memory
+        var counter = 0
+        while (Runtime.getRuntime().freeMemory() < 32 * MEGA_BYTE) {
+            System.gc() // normally gc need ~50ms
+            delay(100)
+            counter++
+            if (counter >= 100) {
+                // wait 10s
+                throw OutOfMemoryError("Memory lower than 32MB for 10s")
+            }
+        }
     }
 
     /**
@@ -42,25 +55,25 @@ object Operations {
         when {
             file.isFile -> async {
                 val totalSize = file.length().toDouble()
-                val futureLinks = LinkedList<Deferred<Link>>()
+                val futureLinks = LinkedList<Link>()
                 logger.info { "Slicing chunks: ${file.canonicalPath}" }
                 var processedSize = 0L
                 var lastTime = 0L
-                // use semaphore to limit the memory usage
-                val s = Semaphore(Runtime.getRuntime().availableProcessors() * 2)
 
                 withContext(Dispatchers.IO) {
                     Files.newInputStream(file.toPath(), StandardOpenOption.READ)
                 }.use { fis ->
-                    slicer.slice(fis).forEach { nextBlob ->
+                    val iter = slicer.slice(fis).iterator()
+                    while (iter.hasNext()) {
+                        waitForMemory()
+                        val nextBlob = iter.next()
                         processedSize += nextBlob.data.size
-                        futureLinks.add(async {
-                            s.acquire()
+                        launch {
                             storage.write(Link.Type.BLOB, nextBlob)
-                                .also { s.release() }
-                        })
+                        }
+                        futureLinks.add(nextBlob.link)
                         // print processing info
-                        if (System.currentTimeMillis() - lastTime >= 1000) {
+                        if (System.currentTimeMillis() - lastTime >= 10_000) {
                             logger.info {
                                 "[${format(processedSize * 100.0 / totalSize)}%]" +
                                         "Processed ${format(processedSize / MEGA_BYTE.toDouble())}MB " +
@@ -78,16 +91,16 @@ object Operations {
                 while (futureLinks.size > 1) {
                     // get some link
                     val listSize = min(listLength, futureLinks.size - i)
-                    val list = LinkedList<Deferred<Link>>()
+                    val list = LinkedList<Link>()
                     for (j in 0 until listSize) {
                         list.add(futureLinks.removeAt(i))
                     }
                     // make it a list
-                    val listObject = ListObject(list.map { it.await() })
-                    val receipt = async { storage.write(Link.Type.LIST, listObject) }
-                    logger.info { "Reconstructing ${file.canonicalPath}: ${futureLinks.size} left" }
+                    val listObject = ListObject(list)
+                    waitForMemory()
+                    launch { storage.write(Link.Type.LIST, listObject) }
                     // update i (next fetch point at next iter)
-                    futureLinks.add(i++, receipt)
+                    futureLinks.add(i++, listObject.link)
                     // reset i if remained links are not enough for a new list
                     if (i + listLength > futureLinks.size) {
                         i = 0
@@ -96,11 +109,11 @@ object Operations {
 
                 // in case the file is empty, slicer return nothing
                 if (futureLinks.size == 0) {
-                    futureLinks.add(async { storage.write(Link.Type.BLOB, Blob(ByteArray(0))) })
+                    futureLinks.add(storage.write(Link.Type.BLOB, Blob(ByteArray(0))))
                 }
                 logger.info { "Finish uploading ${file.canonicalPath}" }
                 // The last one should be the root
-                futureLinks[0].await()
+                futureLinks[0]
             }
 
             file.isDirectory -> async {
@@ -144,6 +157,7 @@ object Operations {
         logger.info { "Restoring ${root.canonicalPath}" }
         when (link.type) {
             Link.Type.BLOB -> {
+                waitForMemory()
                 val blob = storage.read(link) as Blob
                 withContext(Dispatchers.IO) {
                     Files.write(root.toPath(), blob.data, StandardOpenOption.CREATE)
@@ -163,6 +177,7 @@ object Operations {
                         val l = links.pollFirst()
                         when (l.type) {
                             Link.Type.BLOB -> {
+                                waitForMemory()
                                 val blob = storage.read(l) as Blob
                                 withContext(Dispatchers.IO) { it.write(blob.data) }
                             }
@@ -187,6 +202,7 @@ object Operations {
                 }
                 // parallel restore for tree
                 treeObj.content.map { e ->
+                    waitForMemory()
                     async { internalRestore(e.value, storage, File(root, e.key)) }
                 }.forEach { it.await() }
             }
@@ -240,6 +256,7 @@ object Operations {
                     if (lists.contains(link)) {
                         // the sub links are not visited yet
                         // submit the job and waiting
+                        waitForMemory()
                         waitingQueue.add(async { storage.read(link) })
                         lists.remove(link)
                     } // otherwise, the link and its sub links are visited
@@ -247,6 +264,7 @@ object Operations {
 
                 Link.Type.TREE -> {
                     if (trees.contains(link)) {
+                        waitForMemory()
                         waitingQueue.add(async { storage.read(link) })
                         trees.remove(link)
                     }
@@ -270,9 +288,9 @@ object Operations {
         logger.info { "Found ${blobs.size} unreachable blobs, ${lists.size} unreachable lists, and ${trees.size} unreachable trees" }
         // now what we left are unreachable objects
         val deletingQueue = LinkedList<Deferred<Unit>>()
-        blobs.forEach { deletingQueue.add(async { storage.delete(it) }) }
-        lists.forEach { deletingQueue.add(async { storage.delete(it) }) }
-        trees.forEach { deletingQueue.add(async { storage.delete(it) }) }
+        blobs.forEach { waitForMemory();deletingQueue.add(async { storage.delete(it) }) }
+        lists.forEach { waitForMemory();deletingQueue.add(async { storage.delete(it) }) }
+        trees.forEach { waitForMemory();deletingQueue.add(async { storage.delete(it) }) }
         deletingQueue.forEach { it.await() }
     }
 

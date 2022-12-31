@@ -30,15 +30,18 @@ class VerifyEntryCommand : CliktCommand(
         repeat(Runtime.getRuntime().availableProcessors()) {
             launch {
                 for (entry in taskChannel) {
+                    logger.info { "Start checking ${entry.name}" }
                     Operations.resolve(entry, CmdContext.storage)
                         .filter { it.type == Link.Type.BLOB }
                         .forEachIndexed { index, link ->
+                            Operations.waitForMemory()
                             CmdContext.storage.read(link)
                             if (index % 1000 == 0) {
                                 logger.info { "${entry.name}: Checked ${index / 1000}K blobs" }
                             }
                         }
                     taskCounter.decrementAndGet()
+                    logger.info { "Finished ${entry.name}" }
                 }
             }
         }
@@ -49,6 +52,7 @@ class VerifyEntryCommand : CliktCommand(
                 taskChannel.send(entry)
             }
         }
+        taskChannel.close()
         while (taskCounter.get() != 0L) {
             delay(1000)
         }

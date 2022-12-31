@@ -10,6 +10,7 @@ import java.io.InputStream
 class FixedSlicer(
     private val chunkSizeInByte: Int
 ) : Slicer {
+
     override fun slice(input: InputStream): Sequence<Blob> = sequence {
         val buffer = ByteArray(chunkSizeInByte)
         while (true) {

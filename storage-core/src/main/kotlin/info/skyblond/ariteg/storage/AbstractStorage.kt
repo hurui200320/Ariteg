@@ -62,7 +62,7 @@ abstract class AbstractStorage<PathType : Any> : Storage {
             }
         }
 
-        return Link(obj.hashString, type, obj.encoded.size)
+        return obj.link
     }
 
     @Throws(ObjectNotFoundException::class)

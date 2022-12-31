@@ -7,9 +7,8 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
 import info.skyblond.ariteg.Operations
-import info.skyblond.ariteg.storage.obj.Entry
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import java.io.File
@@ -30,22 +29,18 @@ class DownloadCommand : CliktCommand(
         }
         val downloaded = mutableSetOf<String>()
         runBlocking {
-            val taskChannel = Channel<Entry>(Channel.UNLIMITED)
-            repeat(Runtime.getRuntime().availableProcessors()) {
-                launch {
-                    for (entry in taskChannel) {
+            Operations.listEntry(CmdContext.storage)
+                .filter { it.name in workingQueue }
+                .toList()
+                .map { entry ->
+                    runBlocking { Operations.waitForMemory() }
+                    async {
                         logger.info { "Start downloading ${entry.name}..." }
                         Operations.restore(entry, CmdContext.storage, folder)
                         logger.info { "Finished: ${entry.name}" }
                         downloaded.add(entry.name)
                     }
-                }
-            }
-
-            Operations.listEntry(CmdContext.storage)
-                .filter { it.name in workingQueue }
-                .forEach { taskChannel.send(it) }
-            taskChannel.close()
+                }.awaitAll()
         }
         downloaded.forEach {
             echo("Downloaded: $it")

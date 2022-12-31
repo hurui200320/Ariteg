@@ -26,9 +26,9 @@ class UploadCommand : CliktCommand(
                 val entry = Operations.digest(file, getSlicer(), CmdContext.storage)
                 logger.info { "Finished ${entry.name}" }
                 entry
+            }.forEach { entry ->
+                echo("Uploaded: ${entry.name}")
             }
-        }.forEach { entry ->
-            echo("Uploaded: ${entry.name}")
         }
 
         logger.info { "Done" }
