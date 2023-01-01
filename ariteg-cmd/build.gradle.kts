@@ -10,7 +10,9 @@ description = "CLI for ariteg"
 
 application {
     mainClass.set("info.skyblond.ariteg.cmd.MainCommandKt")
-//    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8")
+    // Windows' GB2312 seems not working with jnr-fuse
+    // but forcing UTF-8 will give garbage output on console when working with Chinese
+    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8")
     executableDir = ""
 }
 
