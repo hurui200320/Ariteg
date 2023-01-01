@@ -1,7 +1,10 @@
 package info.skyblond.ariteg.slicers.rolling
 
+import org.apache.commons.io.FileUtils
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import java.io.File
 import kotlin.random.Random
 
 internal class RabinKarpSlicerTest {
@@ -15,18 +18,44 @@ internal class RabinKarpSlicerTest {
 
     @Test
     fun test() {
-        // 16KB
+        // 16KB data
         val content = ByteArray(16384)
         Random.nextBytes(content)
+        val file = File.createTempFile("ariteg-blob", ".blob")
+        file.deleteOnExit()
+        FileUtils.writeByteArrayToFile(file, content)
+
         val blobs = RabinKarpSlicer(
-            0u, (1u shl 10) - 1u,
+            file, 0u, (1u shl 10) - 1u,
             64, 512, 48, 1821497u
-        ).slice(content.inputStream()).map { it.data }
-            .onEach { assertTrue(it.size <= 512) }
-            .toList()
-        println("Total ${blobs.size} blobs, last one is ${blobs.last().size} bytes")
+        ).map { it.data }.onEach { assertTrue(it.size <= 512) }
+
         assertArrayEquals(content, blobs.reduceRight { current, acc ->
             current + acc
         })
+    }
+
+    @Test
+    fun testOverflow() {
+        // 16KB data
+        val content = ByteArray(16384)
+        Random.nextBytes(content)
+        val file = File.createTempFile("ariteg-blob", ".blob")
+        file.deleteOnExit()
+        FileUtils.writeByteArrayToFile(file, content)
+
+        val iterator = RabinKarpSlicer(
+            file, 0u, (1u shl 10) - 1u,
+            64, 512, 48, 1821497u
+        ).iterator()
+
+        while (iterator.hasNext()) {
+            // eat blobs
+            iterator.next()
+        }
+
+        assertThrows<NoSuchElementException> {
+            iterator.next()
+        }
     }
 }

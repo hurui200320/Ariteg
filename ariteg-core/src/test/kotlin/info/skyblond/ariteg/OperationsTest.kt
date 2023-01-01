@@ -3,8 +3,6 @@ package info.skyblond.ariteg
 import info.skyblond.ariteg.slicers.FixedSlicer
 import info.skyblond.ariteg.slicers.Slicer
 import info.skyblond.ariteg.storage.FileStorage
-import info.skyblond.ariteg.storage.obj.Link
-import kotlinx.coroutines.runBlocking
 import org.apache.commons.io.FileUtils
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -17,7 +15,9 @@ import kotlin.test.assertTrue
 
 internal class OperationsTest {
 
-    private val slicer: Slicer = FixedSlicer(1024) // 1k
+    private val slicerProvider: (File) -> Slicer = { file ->
+        FixedSlicer(file, 1024) // 1k
+    }
 
     private lateinit var baseDir: File
     private lateinit var storage: FileStorage
@@ -73,11 +73,11 @@ internal class OperationsTest {
     }
 
     @Test
-    fun testDigest(): Unit = runBlocking {
+    fun testDigest() {
         // prepare root file
         val root = prepareTestRootFolder()
         // test digest & restore
-        val entry = Operations.digest(root, slicer, storage)
+        val entry = Operations.digest(root, slicerProvider, storage)
         val recoveredRoot = File(FileUtils.getTempDirectory(), entry.name)
         Operations.restore(entry, storage, FileUtils.getTempDirectory())
 
@@ -96,40 +96,35 @@ internal class OperationsTest {
     }
 
     @Test
-    fun gc(): Unit = runBlocking {
+    fun gc() {
         // use preload to check nothing goes wrong
         // make sure unused things are deleted
         val root = prepareTestRootFolder()
-        val entry = Operations.digest(root, slicer, storage)
-        val b = storage.listObjects(Link.Type.BLOB).toList()
-        val l = storage.listObjects(Link.Type.LIST).toList()
-        val t = storage.listObjects(Link.Type.TREE).toList()
+        val entry = Operations.digest(root, slicerProvider, storage)
+        val (b, l, t) = storage.listObjects().get()
 
         val root2 = prepareTestRootFolder()
-        val entry2 = Operations.digest(root2, slicer, storage)
-        Operations.listEntry(storage).toList().also {
+        val entry2 = Operations.digest(root2, slicerProvider, storage)
+        Operations.listEntry(storage).also {
             assertEquals(2, it.size)
             assertTrue { it.contains(entry) }
             assertTrue { it.contains(entry2) }
         }
 
         Operations.deleteEntry(entry2, storage)
-        Operations.listEntry(storage).toList().also {
+        Operations.listEntry(storage).also {
             assertEquals(1, it.size)
             assertTrue { it.contains(entry) }
         }
 
         Operations.gc(storage)
 
-
-        val b1 = storage.listObjects(Link.Type.BLOB).toList()
-        val l1 = storage.listObjects(Link.Type.LIST).toList()
-        val t1 = storage.listObjects(Link.Type.TREE).toList()
+        val (b1, l1, t1) = storage.listObjects().get()
         assertEquals(b, b1)
         assertEquals(l, l1)
         assertEquals(t, t1)
         assertDoesNotThrow {
-            runBlocking { Operations.resolve(entry, storage).forEach { storage.read(it) } }
+            Operations.resolve(entry, storage).forEach { storage.read(it) }
         }
 
     }

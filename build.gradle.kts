@@ -2,12 +2,12 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("java")
-    kotlin("jvm") version "1.7.21"
+    kotlin("jvm") version "1.7.20"
     id("maven-publish")
 }
 
 group = "info.skyblond.ariteg"
-version = "1.0.0"
+version = VersionUtils.getVersion()
 description = "Root project of ariteg"
 
 allprojects {
@@ -24,9 +24,10 @@ allprojects {
     dependencies {
         // kotlin logging
         implementation("io.github.microutils:kotlin-logging-jvm:3.0.4")
+        implementation("ch.qos.logback:logback-classic:1.4.5")
         // test
         testImplementation(kotlin("test"))
-        testImplementation("org.mockito:mockito-core:4.10.0")
+        testImplementation("org.mockito:mockito-core:4.9.0")
     }
 
     tasks.test {
@@ -65,7 +66,7 @@ subprojects {
         publications {
             create<MavenPublication>("maven") {
                 groupId = "info.skyblond.ariteg"
-                version = rootProject.version as String
+                version = VersionUtils.getVersion()
                 artifactId = project.name
                 from(components["java"])
                 pom {

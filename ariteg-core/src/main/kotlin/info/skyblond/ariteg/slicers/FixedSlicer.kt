@@ -1,22 +1,58 @@
 package info.skyblond.ariteg.slicers
 
-import info.skyblond.ariteg.storage.obj.Blob
-import java.io.InputStream
+import info.skyblond.ariteg.Blob
+import java.io.File
+import java.io.FileInputStream
 
 /**
  * Slice file into fixed length chunks.
- * This is thread-safe. But the sequence is not.
+ * This is thread-safe. But the iterator is NOT thread-safe.
  * */
 class FixedSlicer(
+    private val file: File,
     private val chunkSizeInByte: Int
 ) : Slicer {
 
-    override fun slice(input: InputStream): Sequence<Blob> = sequence {
-        val buffer = ByteArray(chunkSizeInByte)
-        while (true) {
-            val readCount = input.read(buffer)
-            if (readCount == -1) break // EOF
-            yield(Blob(buffer.copyOfRange(0, readCount)))
+    /**
+     * Create a new iterator which will slice and return the blobs.
+     * The returned iterator is not thread-safe.
+     * */
+    override fun iterator(): Iterator<Blob> = object : Iterator<Blob>, AutoCloseable {
+        private val chunkStream = FileInputStream(file)
+        private var closed = false
+        private val chunkSize = chunkSizeInByte
+        private val buffer = ByteArray(chunkSize)
+        private var lastReadCount = 0
+
+        // if not closed, has next
+        override fun hasNext(): Boolean {
+            // try read, but not read multiple times before next() is called
+            if (lastReadCount == 0 && !closed) {
+                lastReadCount = chunkStream.readNBytes(buffer, 0, chunkSize)
+                if (lastReadCount == 0) {
+                    closed = true
+                    close()
+                }
+            }
+            // if not closed, then has next element
+            return !closed
+        }
+
+        override fun next(): Blob {
+            if (hasNext()) {
+                val chunk = ByteArray(lastReadCount)
+                System.arraycopy(buffer, 0, chunk, 0, lastReadCount)
+                // cleat last read count, so hasNext() can fill the buffer
+                lastReadCount = 0
+                return Blob(chunk)
+            } else {
+                throw NoSuchElementException("No further elements")
+            }
+        }
+
+        override fun close() {
+            chunkStream.close()
         }
     }
+
 }

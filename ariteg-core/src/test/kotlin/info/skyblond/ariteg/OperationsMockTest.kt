@@ -1,14 +1,11 @@
 package info.skyblond.ariteg
 
 import info.skyblond.ariteg.storage.Storage
-import info.skyblond.ariteg.storage.obj.Entry
-import info.skyblond.ariteg.storage.obj.Link
-import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
-import java.time.ZonedDateTime
 import java.util.*
+import java.util.concurrent.CompletableFuture
 
 /**
  * This test make sure the [Operations] call the right api.
@@ -24,10 +21,10 @@ class OperationsMockTest {
 
 
     @Test
-    fun testResolve(): Unit = runBlocking {
+    fun testResolve() {
         val link = Link("Something", Link.Type.BLOB, -1)
-        `when`(storage.resolve(link)).thenReturn(emptySequence())
-        Operations.resolve(Entry("name", link, ZonedDateTime.now()), storage)
+        `when`(storage.resolve(link)).thenReturn(CompletableFuture.supplyAsync { emptySet() })
+        Operations.resolve(Entry("name", link, Date()), storage)
         verify(storage, times(1)).resolve(link)
     }
 }

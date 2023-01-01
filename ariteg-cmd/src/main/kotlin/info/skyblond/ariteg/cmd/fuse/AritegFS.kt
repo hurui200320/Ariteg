@@ -1,11 +1,11 @@
 package info.skyblond.ariteg.cmd.fuse
 
+import info.skyblond.ariteg.Entry
+import info.skyblond.ariteg.Link
 import info.skyblond.ariteg.cmd.CmdContext
-import info.skyblond.ariteg.storage.obj.Entry
-import info.skyblond.ariteg.storage.obj.Link
+import info.skyblond.ariteg.cmd.asOtcInt
 import jnr.ffi.Pointer
 import jnr.posix.FileStat.*
-import mu.KLogger
 import ru.serce.jnrfuse.ErrorCodes
 import ru.serce.jnrfuse.FuseFillDir
 import ru.serce.jnrfuse.FuseStubFS
@@ -14,8 +14,6 @@ import ru.serce.jnrfuse.struct.FuseFileInfo
 import ru.serce.jnrfuse.struct.Statvfs
 import java.math.BigInteger
 import kotlin.math.min
-
-internal fun String.asOtcInt(): Int = this.dropWhile { it == '0' }.let { it.ifEmpty { "0" } }.toInt(radix = 8)
 
 class AritegFS(
     /**
@@ -34,8 +32,8 @@ class AritegFS(
      * Permission mask for files (LIST and BLOB nodes). Default is 0644
      * */
     private val fileMask: Int = "0644".asOtcInt(),
-    private val logger: KLogger
 ) : FuseStubFS() {
+    private val logger = CmdContext.logger
     private val fsId: Long = System.currentTimeMillis()
 
     /**
@@ -49,8 +47,8 @@ class AritegFS(
         path.dropWhile { it == '/' } // remove leading slash
             .split('/')
             .let { seg ->
-                val entryName = seg[0]
-                var link = RandomAccessCache.getCachedEntry(entryName)?.root
+                val entryId = seg[0].split(" ")[0]
+                var link = RandomAccessCache.getCachedEntry(entryId)?.link
                     ?: return null to -ErrorCodes.ENOENT()
 
                 for (i in 1 until seg.size) {
@@ -61,7 +59,7 @@ class AritegFS(
                     }
                     // update link with result
                     link = RandomAccessCache.getCachedTree(link)?.content
-                        ?.get(currentFindingEntryName)
+                        ?.find { it.name == currentFindingEntryName }
                         ?: return null to -ErrorCodes.ENOENT()
                 }
                 return link to 0
@@ -76,10 +74,9 @@ class AritegFS(
             }
 
     private fun mapEntryToFileName(entry: Entry): String {
-        return entry.name.also {
-            require(!it.contains("\\")) { "Bad entry name: $it" }
-            require(!it.contains("/")) { "Bad entry name: $it" }
-        }
+        return entry.id + " " + entry.name
+            .replace('\\', '_') // windows separator
+            .replace('/', '_') // fuse separator
     }
 
     private fun nockOffWritePermission(permission: Int): Int =
@@ -116,7 +113,7 @@ class AritegFS(
             }
             // set time as entry
             resolveEntry(path)?.let { entry ->
-                val unixTime = entry.ctime.toInstant().epochSecond
+                val unixTime = entry.time.time / 1000
                 stat.st_birthtime.tv_sec.set(unixTime)
                 stat.st_mtim.tv_sec.set(unixTime)
                 stat.st_ctim.tv_sec.set(unixTime)
@@ -158,7 +155,7 @@ class AritegFS(
             // root folder
             fillDirFiller(
                 path, buf, filler,
-                CmdContext.storage.listEntry().map { mapEntryToFileName(it) }.toList()
+                CmdContext.storage.listEntry().map { mapEntryToFileName(it) }
             )
         } else {
             // everything else
@@ -171,7 +168,7 @@ class AritegFS(
                 val tree = RandomAccessCache.getCachedTree(link)
                 // TreeObject ensure content has unique name
                 fillDirFiller(path, buf, filler,
-                    tree?.content?.map { it.key } ?: emptyList())
+                    tree?.content?.map { it.name!! } ?: emptyList())
             } catch (t: Throwable) {
                 logger.error(t) { "Failed to read object when reading dir" }
                 return -ErrorCodes.EIO()
@@ -243,7 +240,7 @@ class AritegFS(
         if (path == "/") {
             // get total file size
             val (result, remainder) = CmdContext.storage.listEntry()
-                .map { RandomAccessCache.calculateFileSize(it.root) }
+                .map { RandomAccessCache.calculateFileSize(it.link) }
                 .sumOf { it }.divideAndRemainder(blockUnit.toBigInteger())
             stbuf.f_blocks.set(
                 if (remainder > BigInteger.ZERO) result + BigInteger.ONE else result

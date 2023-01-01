@@ -1,6 +1,9 @@
 package info.skyblond.ariteg.slicers.rolling
 
+import java.io.File
+
 class RabinKarpSlicer(
+    file: File,
     targetFingerprint: UInt,
     fingerprintMask: UInt,
     minChunkSize: Int,
@@ -12,7 +15,7 @@ class RabinKarpSlicer(
     private val prime: UInt,
     channelBufferSize: Int = 32 * 1024 * 1024
 ) : RollingHashSlicer(
-    targetFingerprint, fingerprintMask,
+    file, targetFingerprint, fingerprintMask,
     minChunkSize, maxChunkSize, windowSize, channelBufferSize
 ) {
 

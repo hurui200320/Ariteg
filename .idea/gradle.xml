@@ -11,9 +11,8 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/ariteg-cmd" />
             <option value="$PROJECT_DIR$/ariteg-core" />
-            <option value="$PROJECT_DIR$/storage-core" />
-            <option value="$PROJECT_DIR$/storage-file" />
-            <option value="$PROJECT_DIR$/storage-minio" />
+            <option value="$PROJECT_DIR$/ariteg-minio" />
+            <option value="$PROJECT_DIR$/buildSrc" />
           </set>
         </option>
       </GradleProjectSettings>
