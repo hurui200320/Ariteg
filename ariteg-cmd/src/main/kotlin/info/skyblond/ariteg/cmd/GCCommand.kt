@@ -7,7 +7,7 @@ import mu.KotlinLogging
 
 class GCCommand : CliktCommand(
     name = "gc",
-    help = "Remove all unused objects"
+    help = "Remove all unused objects. This command will scan all entries, find all unreadable objs and delete them."
 ) {
     private val logger = KotlinLogging.logger("GC")
 

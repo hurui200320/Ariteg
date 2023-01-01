@@ -15,9 +15,9 @@ class UploadCommand : CliktCommand(
 ) {
     private val logger = KotlinLogging.logger("Upload")
 
-    private val files: List<File> by argument(name = "Path", help = "Path to content to be uploaded")
+    private val files: List<File> by argument(name = "path", help = "Path to content to be uploaded, can be multiple")
         .file(mustExist = true, canBeFile = true, canBeDir = true)
-        .multiple()
+        .multiple(required = true)
 
     override fun run() {
         runBlocking {

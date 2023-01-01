@@ -2,8 +2,11 @@ package info.skyblond.ariteg.cmd
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
+import info.skyblond.ariteg.Operations
 
-class MainCommand : CliktCommand() {
+class MainCommand : CliktCommand(
+    name = "ariteg-cmd"
+) {
     init {
         subcommands(
             // CRUD
@@ -22,7 +25,6 @@ class MainCommand : CliktCommand() {
     }
 
     override fun run() {
-        // nop
     }
 }
 

@@ -9,7 +9,10 @@ import mu.KotlinLogging
 
 class IntegrityCheckCommand : CliktCommand(
     name = "ic",
-    help = "Make sure all blobs are correct, and delete corrupted blobs"
+    help = "Make sure all blobs are correct, and delete corrupted blobs. " +
+            "This command will read all blobs from storage to make sure it's fine. " +
+            "This will cost a lot of IO operations, careful if you're using something " +
+            "like AWS S3 or other billed by usage service."
 ) {
     private val logger = KotlinLogging.logger("IntegrityCheck")
 

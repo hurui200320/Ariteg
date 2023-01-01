@@ -48,8 +48,6 @@ good with it.
 The `storage-minio` is the storage backend based on minio sdk, which basically is
 self-hosted S3.
 
-Read the [wiki](https://github.com/hurui200320/Ariteg/wiki) for more detailed info.
-
 ### AGPL? WTF??
 
 Yes, I choose AGPL v3. Since my plan is to write code and push, no maintain in the future,

@@ -23,13 +23,23 @@ class FindCommand : CliktCommand(
     name = "find",
     help = "Find certain entries and apply the operation"
 ) {
-    private val query: String by argument(name = "Query", help = "The query written in groovy, must return bool,")
-        .default("true")
+    private val query: String by argument(
+        name = "query",
+        help = "The query written in groovy, must return bool. " +
+                "This is a restricted env, you can only use it to filter entries. " +
+                "The query will be tested against every entry, you can refer the current entry " +
+                "as `entry`, and the current time as `now`. For example, you can use " +
+                "`entry.name.endsWith('.mp4') && entry.ctime.isBefore(now.minusDays(3))` " +
+                "to find all mp4 files that created before 3 days ago."
+    ).default("true")
 
     private val download: File? by option("-d", "--download-path", help = "Download entry into the path")
         .file(mustExist = false, canBeFile = false, canBeDir = true)
 
-    private val delete: Boolean by option("-r", "--rm", help = "Remove the entry")
+    private val delete: Boolean by option(
+        "-r", "--rm", help = "Remove the entry. With multiple operations, " +
+                "this is the last one to execute."
+    )
         .flag("--no-rm", default = false)
 
     override fun run() {

@@ -15,12 +15,15 @@ import java.util.concurrent.atomic.AtomicLong
 
 class VerifyEntryCommand : CliktCommand(
     name = "verify",
-    help = "Make sure the given entry is readable"
+    help = "Make sure the given entry is readable. " +
+            "This command will essentially download the whole entry and discard it. " +
+            "It will make sure the entry is fine, or will throw an error. " +
+            "Careful when using with AWS S3 or other billed by usage services."
 ) {
     private val logger = KotlinLogging.logger("Verify")
 
     private val names: List<String> by argument(
-        name = "Names", help = "Entry names. Empty means check all entries"
+        name = "names", help = "Entry names, can be multiple. Empty means check all entries"
     ).multiple()
 
     override fun run() = runBlocking {

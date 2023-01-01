@@ -111,7 +111,7 @@ class StatusCommand : CliktCommand(
                     "Blobs: ${blobCount}/${blobCount - blobs.size}/${blobs.count { it.value > 1 }}\n" +
                     "Lists: ${listCount}/${listCount - lists.size}/${lists.count { it.value > 1 }}\n" +
                     "Trees: ${treeCount}/${treeCount - trees.size}/${trees.count { it.value > 1 }}\n" +
-                    "\nReachable blobs: ${FileUtils.byteCountToDisplaySize(pureBlobSize.get())} (${pureBlobSize.get()} bytes)\n" +
+                    "\nReachable blobs:  ${FileUtils.byteCountToDisplaySize(pureBlobSize.get())} (${pureBlobSize.get()} bytes)\n" +
                     "Represented size: ${FileUtils.byteCountToDisplaySize(representedSize.get())} (${representedSize.get()} bytes)\n"
         )
     }

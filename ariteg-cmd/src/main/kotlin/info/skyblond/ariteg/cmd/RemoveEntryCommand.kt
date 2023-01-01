@@ -9,7 +9,10 @@ class RemoveEntryCommand : CliktCommand(
     name = "rm",
     help = "Remove the given entry"
 ) {
-    private val names: List<String> by argument(name = "Name", help = "Entry names").multiple()
+    private val names: List<String> by argument(
+        name = "name",
+        help = "Entry names, can be multiple. At least one."
+    ).multiple(required = true)
 
     override fun run() {
         val deleted = mutableSetOf<String>()

@@ -20,9 +20,19 @@ object CmdContext {
     @JvmStatic
     val storage: Storage = kotlin.run {
         val connectString: String = System.getenv(ENV_CONNECT_STRING)
-            ?: error("Env `$ENV_CONNECT_STRING` not set")
+            ?: error(
+                "Env `$ENV_CONNECT_STRING` not set.\n" +
+                        "Format: \n" +
+                        "\tfile://path/to/data/folder\n" +
+                        "\tminio://access@secret:host[:port]/bucketName"
+            )
         val keyBase64: String = System.getenv(ENV_ENCRYPTION_KEY)
-            ?: "".also { logger.warn { "Env `$ENV_ENCRYPTION_KEY` not set, no encryption" } }
+            ?: "".also {
+                logger.warn {
+                    "Env `$ENV_ENCRYPTION_KEY` not set, no encryption.\n" +
+                            "To enable encryption, supply base64 encoded key (32 bytes)."
+                }
+            }
 
         when {
             connectString.startsWith("file://") -> {

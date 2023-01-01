@@ -11,7 +11,7 @@ import java.nio.file.Paths
 
 class MountCommand : CliktCommand(
     name = "mount",
-    help = "mount as FUSE"
+    help = "mount as FUSE. Check jnr-fuse for more detailed info."
 ) {
     private val logger = KotlinLogging.logger("Mount")
 

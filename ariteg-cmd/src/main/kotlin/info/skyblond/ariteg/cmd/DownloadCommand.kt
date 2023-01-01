@@ -15,11 +15,14 @@ import java.io.File
 
 class DownloadCommand : CliktCommand(
     name = "download",
-    help = "Download a entry from the storage"
+    help = "Download entries from the storage"
 ) {
     private val logger = KotlinLogging.logger("Download")
-    private val names: List<String> by argument(name = "Names", help = "Entry id. Empty for all").multiple()
-    private val folder: File by option("-p", "--path", help = "Path to root download folder")
+    private val names: List<String> by argument(
+        name = "name", help = "Entry name, can be multiple. " +
+                "Leave empty means download all"
+    ).multiple()
+    private val folder: File by option("-p", "--path", help = "Path to download folder")
         .file(mustExist = false, canBeFile = false, canBeDir = true)
         .required()
 

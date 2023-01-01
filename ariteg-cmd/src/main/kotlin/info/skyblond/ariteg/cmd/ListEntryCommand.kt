@@ -9,7 +9,8 @@ import java.time.format.DateTimeFormatter
 
 class ListEntryCommand : CliktCommand(
     name = "ls",
-    help = "List all entries in the given storage"
+    help = "List all entries in the given storage. " +
+            "Print format: root_link_type(blob/list/tree) size_in_byte create_time(ISO_OFFSET_DATE_TIME) name"
 ) {
     override fun run() {
         val entries = Operations.listEntry(CmdContext.storage)
