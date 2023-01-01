@@ -1,9 +1,7 @@
 package info.skyblond.ariteg.cmd
 
-import info.skyblond.ariteg.slicers.FixedSlicer
-import info.skyblond.ariteg.slicers.SlicerProvider
+import info.skyblond.ariteg.slicers.Slicer
 import info.skyblond.ariteg.slicers.rolling.RabinKarpSlicer
-import java.io.File
 
 private data class FixedSlicerConfig(
     /**
@@ -44,25 +42,15 @@ private data class RabinKarpSlicerConfig(
     val prime: UInt = 1821497u
 )
 
-fun getSlicerProvider(): SlicerProvider =
-    (RollingSlicerConfig() to RabinKarpSlicerConfig()).let { (rollingConfig, rabinKarpConfig) ->
-        { f: File ->
-            if (f.length() < rollingConfig.windowSize) {
-                FixedSlicer(
-                    file = f,
-                    chunkSizeInByte = FixedSlicerConfig().chunkSizeInByte
-                )
-            } else {
-                RabinKarpSlicer(
-                    file = f,
-                    targetFingerprint = rollingConfig.targetFingerprint,
-                    fingerprintMask = rollingConfig.fingerprintMask,
-                    minChunkSize = rollingConfig.minChunkSize,
-                    maxChunkSize = rollingConfig.maxChunkSize,
-                    windowSize = rollingConfig.windowSize,
-                    prime = rabinKarpConfig.prime,
-                    channelBufferSize = rollingConfig.channelBufferSize
-                )
-            }
-        }
+fun getSlicer(): Slicer = (RollingSlicerConfig() to RabinKarpSlicerConfig())
+    .let { (rollingConfig, rabinKarpConfig) ->
+        RabinKarpSlicer(
+            targetFingerprint = rollingConfig.targetFingerprint,
+            fingerprintMask = rollingConfig.fingerprintMask,
+            minChunkSize = rollingConfig.minChunkSize,
+            maxChunkSize = rollingConfig.maxChunkSize,
+            windowSize = rollingConfig.windowSize,
+            prime = rabinKarpConfig.prime,
+            channelBufferSize = rollingConfig.channelBufferSize
+        )
     }

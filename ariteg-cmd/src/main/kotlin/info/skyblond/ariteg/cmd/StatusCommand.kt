@@ -1,25 +1,28 @@
 package info.skyblond.ariteg.cmd
 
 import com.github.ajalt.clikt.core.CliktCommand
-import info.skyblond.ariteg.*
-import kotlinx.coroutines.*
+import info.skyblond.ariteg.Operations
+import info.skyblond.ariteg.storage.obj.Link
+import info.skyblond.ariteg.storage.obj.ListObject
+import info.skyblond.ariteg.storage.obj.TreeObject
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.apache.commons.io.FileUtils
 import java.math.BigInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.CoroutineContext
 
 class StatusCommand : CliktCommand(
     name = "status",
     help = "Perform a full object scan and show some status"
-), CoroutineScope {
-
-    override fun run() {
-        CmdContext.setLogger(KotlinLogging.logger("Status"))
-
+) {
+    private val logger = KotlinLogging.logger("Status")
+    override fun run(): Unit = runBlocking {
         val entries = Operations.listEntry(CmdContext.storage)
         val pureBlobSize = AtomicReference(BigInteger.ZERO)
         val representedSize = AtomicReference(BigInteger.ZERO)
@@ -29,16 +32,26 @@ class StatusCommand : CliktCommand(
 
         val jobCounter = AtomicLong(0)
 
-        CmdContext.logger.info { "Scanning objects, this make takes a lot of time and I/O ops...." }
-        val listObjFuture = CmdContext.storage.listObjects()
+        logger.info { "Scanning objects, this make takes a lot of time and I/O ops...." }
+        val countObjFuture = async {
+            Triple(
+                CmdContext.storage.listObjects(Link.Type.BLOB).count(),
+                CmdContext.storage.listObjects(Link.Type.LIST).count(),
+                CmdContext.storage.listObjects(Link.Type.TREE).count(),
+            )
+        }
 
         val linkChannel = Channel<Link>(Int.MAX_VALUE)
         // create workers
-        repeat(Runtime.getRuntime().availableProcessors()) {
+        repeat(Runtime.getRuntime().availableProcessors() * 2) {
             launch {
                 for (link in linkChannel) {
                     // read the link
-                    val objFuture = CmdContext.storage.read(link)
+                    val objFuture = async {
+                        if (link.type != Link.Type.BLOB)
+                            CmdContext.storage.read(link)
+                        else null
+                    }
                     // update counter
                     var shouldCountPureSize = false
                     when (link.type) {
@@ -51,23 +64,20 @@ class StatusCommand : CliktCommand(
                         v?.plus(1) ?: 1L.also { shouldCountPureSize = true }
                     }
                     // get the result and handle sub links
-                    val obj = withContext(Dispatchers.IO) {
-                        objFuture.get()
-                    }
                     when (link.type) {
                         Link.Type.BLOB -> emptyList<Link>()
                             .also {
                                 representedSize.updateAndGet {
-                                    it.add((obj as Blob).data.size.toBigInteger())
+                                    it.add(link.size.toBigInteger())
                                 }
                                 if (shouldCountPureSize)
                                     pureBlobSize.updateAndGet {
-                                        it.add((obj as Blob).data.size.toBigInteger())
+                                        it.add(link.size.toBigInteger())
                                     }
                             }
 
-                        Link.Type.LIST -> (obj as ListObject).content
-                        Link.Type.TREE -> (obj as TreeObject).content
+                        Link.Type.LIST -> (objFuture.await() as ListObject).content
+                        Link.Type.TREE -> (objFuture.await() as TreeObject).content.map { it.value }
                     }.forEach { jobCounter.incrementAndGet();linkChannel.send(it) }
                     // finished job
                     jobCounter.decrementAndGet()
@@ -75,41 +85,34 @@ class StatusCommand : CliktCommand(
             }
         }
 
-        runBlocking {
-            entries.forEach { entry ->
-                jobCounter.incrementAndGet()
-                linkChannel.send(entry.link)
-            }
-            loop@ while (jobCounter.get() != 0L) {
-                CmdContext.logger.info { "Remain links: ${jobCounter.get()}" }
-                // print every 2min, but check each second
-                for (i in 1..120) {
-                    delay(1000)
-                    if (jobCounter.get() == 0L)
-                        break@loop
-                }
-            }
-            // close channel, so workers can exit
-            linkChannel.close()
+        entries.forEach { entry ->
+            jobCounter.incrementAndGet()
+            linkChannel.send(entry.root)
         }
-        CmdContext.logger.info { "Analyzing result..." }
-        val (blobSet, listSet, treeSet) = listObjFuture.get()
+        loop@ while (jobCounter.get() != 0L) {
+            logger.info { "Remain links: ${jobCounter.get()}" }
+            // print every 2min, but check each second
+            for (i in 1..120) {
+                delay(1000)
+                if (jobCounter.get() == 0L)
+                    break@loop
+            }
+        }
+        // close channel, so workers can exit
+        linkChannel.close()
+        logger.info { "Analyzing result..." }
+        val (blobCount, listCount, treeCount) = countObjFuture.await()
 
         // print the result
-        CmdContext.logger.info {
+        echo(
             "\n-------------------- Status --------------------\n" +
-                    "Total entries: ${entries.size}\n\n" +
+                    "Total entries: ${entries.count()}\n\n" +
                     "Type: Total/Unused/Reused\n" +
-                    "Blobs: ${blobSet.size}/${blobSet.size - blobs.size}/${blobs.count { it.value > 1 }}\n" +
-                    "Lists: ${listSet.size}/${listSet.size - lists.size}/${lists.count { it.value > 1 }}\n" +
-                    "Trees: ${treeSet.size}/${treeSet.size - trees.size}/${trees.count { it.value > 1 }}\n" +
-                    "\nPure blob size: ${FileUtils.byteCountToDisplaySize(pureBlobSize.get())} (${pureBlobSize.get()} bytes)\n" +
+                    "Blobs: ${blobCount}/${blobCount - blobs.size}/${blobs.count { it.value > 1 }}\n" +
+                    "Lists: ${listCount}/${listCount - lists.size}/${lists.count { it.value > 1 }}\n" +
+                    "Trees: ${treeCount}/${treeCount - trees.size}/${trees.count { it.value > 1 }}\n" +
+                    "\nReachable blobs:  ${FileUtils.byteCountToDisplaySize(pureBlobSize.get())} (${pureBlobSize.get()} bytes)\n" +
                     "Represented size: ${FileUtils.byteCountToDisplaySize(representedSize.get())} (${representedSize.get()} bytes)\n"
-        }
+        )
     }
-
-
-    private val job = Job()
-    override val coroutineContext: CoroutineContext
-        get() = job
 }
