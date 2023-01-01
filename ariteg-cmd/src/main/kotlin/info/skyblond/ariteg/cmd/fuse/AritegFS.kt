@@ -1,11 +1,11 @@
 package info.skyblond.ariteg.cmd.fuse
 
-import info.skyblond.ariteg.Entry
-import info.skyblond.ariteg.Link
 import info.skyblond.ariteg.cmd.CmdContext
-import info.skyblond.ariteg.cmd.asOtcInt
+import info.skyblond.ariteg.storage.obj.Entry
+import info.skyblond.ariteg.storage.obj.Link
 import jnr.ffi.Pointer
 import jnr.posix.FileStat.*
+import mu.KLogger
 import ru.serce.jnrfuse.ErrorCodes
 import ru.serce.jnrfuse.FuseFillDir
 import ru.serce.jnrfuse.FuseStubFS
@@ -13,8 +13,9 @@ import ru.serce.jnrfuse.struct.FileStat
 import ru.serce.jnrfuse.struct.FuseFileInfo
 import ru.serce.jnrfuse.struct.Statvfs
 import java.math.BigInteger
-import kotlin.math.max
 import kotlin.math.min
+
+internal fun String.asOtcInt(): Int = this.dropWhile { it == '0' }.let { it.ifEmpty { "0" } }.toInt(radix = 8)
 
 class AritegFS(
     /**
@@ -33,8 +34,8 @@ class AritegFS(
      * Permission mask for files (LIST and BLOB nodes). Default is 0644
      * */
     private val fileMask: Int = "0644".asOtcInt(),
+    private val logger: KLogger
 ) : FuseStubFS() {
-    private val logger = CmdContext.logger
     private val fsId: Long = System.currentTimeMillis()
 
     /**
@@ -48,8 +49,8 @@ class AritegFS(
         path.dropWhile { it == '/' } // remove leading slash
             .split('/')
             .let { seg ->
-                val entryId = seg[0].split(" ")[0]
-                var link = CmdContext.storage.listEntry().find { it.id == entryId }?.link
+                val entryName = seg[0]
+                var link = RandomAccessCache.getCachedEntry(entryName)?.root
                     ?: return null to -ErrorCodes.ENOENT()
 
                 for (i in 1 until seg.size) {
@@ -60,7 +61,7 @@ class AritegFS(
                     }
                     // update link with result
                     link = RandomAccessCache.getCachedTree(link)?.content
-                        ?.find { it.name == currentFindingEntryName }
+                        ?.get(currentFindingEntryName)
                         ?: return null to -ErrorCodes.ENOENT()
                 }
                 return link to 0
@@ -71,13 +72,14 @@ class AritegFS(
             .split('/')
             .let { seg ->
                 val entryId = seg[0].split(" ")[0]
-                CmdContext.storage.listEntry().find { it.id == entryId }
+                RandomAccessCache.getCachedEntry(entryId)
             }
 
     private fun mapEntryToFileName(entry: Entry): String {
-        return entry.id + " " + entry.name
-            .replace('\\', '_') // windows separator
-            .replace('/', '_') // fuse separator
+        return entry.name.also {
+            require(!it.contains("\\")) { "Bad entry name: $it" }
+            require(!it.contains("/")) { "Bad entry name: $it" }
+        }
     }
 
     private fun nockOffWritePermission(permission: Int): Int =
@@ -114,7 +116,7 @@ class AritegFS(
             }
             // set time as entry
             resolveEntry(path)?.let { entry ->
-                val unixTime = entry.time.time / 1000
+                val unixTime = entry.ctime.toInstant().epochSecond
                 stat.st_birthtime.tv_sec.set(unixTime)
                 stat.st_mtim.tv_sec.set(unixTime)
                 stat.st_ctim.tv_sec.set(unixTime)
@@ -156,7 +158,7 @@ class AritegFS(
             // root folder
             fillDirFiller(
                 path, buf, filler,
-                CmdContext.storage.listEntry().map { mapEntryToFileName(it) }
+                CmdContext.storage.listEntry().map { mapEntryToFileName(it) }.toList()
             )
         } else {
             // everything else
@@ -169,7 +171,7 @@ class AritegFS(
                 val tree = RandomAccessCache.getCachedTree(link)
                 // TreeObject ensure content has unique name
                 fillDirFiller(path, buf, filler,
-                    tree?.content?.map { it.name!! } ?: emptyList())
+                    tree?.content?.map { it.key } ?: emptyList())
             } catch (t: Throwable) {
                 logger.error(t) { "Failed to read object when reading dir" }
                 return -ErrorCodes.EIO()
@@ -197,41 +199,34 @@ class AritegFS(
         if (link == null) return errorCode
         // the link should be list or blob.
         if (link.type == Link.Type.TREE) return -ErrorCodes.EISDIR()
-        // try to get index
-        val raIndex = RandomAccessCache.getIndex(link) ?: return -ErrorCodes.EIO()
-        // skip the offset, find the first obj to read
-        var walkedCount = 0L
+        // try to get index, and find the first blob we need
+        val blobs = (RandomAccessCache.getIndex(link) ?: return -ErrorCodes.EIO())
+            // starting offset + size of blob <= offset, skip it
+            .dropWhile { (blobOffset, blobLink) -> blobOffset + blobLink.size < offset }
+            // take only if starting offset is in range
+            .takeWhile { (blobOffset, _) -> blobOffset <= offset + size }
+
+        // read in a loop
         var readCount = 0L
-        // loop to process
-        // the index use ArrayList, won't exceed Int.MAX_VALUE anyway
-        for (i in raIndex.indices) {
-            val objLink = raIndex[i]
-            if (offset - walkedCount > objLink.size) {
-                // need more walk, skip this obj
-                walkedCount += objLink.size
-                continue
+        for (i in blobs.indices) {
+            val objLink = blobs[i].link
+            // if this is the first blob, we need to account the skipped part
+            // else, reading from 0
+            val iOffset = if (i != 0) 0 else offset - blobs.first().offset
+            // find out how much data we read
+            val iSize = min(objLink.size - iOffset, size - readCount)
+            try {
+                // read the blob
+                val blob = RandomAccessCache.getCachedBlob(objLink) ?: return -ErrorCodes.EIO()
+                // copy data
+                buf.put(readCount, blob.data, iOffset.toInt(), iSize.toInt())
+                readCount += iSize
+            } catch (t: Throwable) {
+                logger.error(t) { "Error when reading $link at path $path" }
+                return -ErrorCodes.EIO()
             }
-            if (walkedCount + objLink.size > offset) {
-                // this is the object we want to read
-                // find the starting point
-                val iOffset = max(0, offset - walkedCount)
-                // find out how much data we read
-                val iSize = min(objLink.size - iOffset, size - readCount)
-                try {
-                    // read the blob
-                    val blob = RandomAccessCache.getCachedBlob(objLink) ?: return -ErrorCodes.EIO()
-                    // copy data
-                    buf.put(readCount, blob.data, iOffset.toInt(), iSize.toInt())
-                    // update walked and read count
-                    walkedCount += objLink.size
-                    readCount += iSize
-                } catch (t: Throwable) {
-                    logger.error(t) { "Error when reading $link at path $path" }
-                    return -ErrorCodes.EIO()
-                }
-                if (readCount >= size)
-                    break
-            }
+            if (readCount >= size)
+                break
         }
 
         return readCount.toInt() // return the number of actual bytes read
@@ -248,7 +243,7 @@ class AritegFS(
         if (path == "/") {
             // get total file size
             val (result, remainder) = CmdContext.storage.listEntry()
-                .map { RandomAccessCache.calculateFileSize(it.link) }
+                .map { RandomAccessCache.calculateFileSize(it.root) }
                 .sumOf { it }.divideAndRemainder(blockUnit.toBigInteger())
             stbuf.f_blocks.set(
                 if (remainder > BigInteger.ZERO) result + BigInteger.ONE else result

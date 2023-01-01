@@ -3,16 +3,28 @@ package info.skyblond.ariteg.cmd
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
-import mu.KotlinLogging
+import info.skyblond.ariteg.Operations
 
 class RemoveEntryCommand : CliktCommand(
     name = "rm",
     help = "Remove the given entry"
 ) {
-    private val ids: List<String> by argument(name = "ID", help = "Entry ids").multiple()
+    private val names: List<String> by argument(
+        name = "name",
+        help = "Entry names, can be multiple. At least one."
+    ).multiple(required = true)
 
     override fun run() {
-        CmdContext.setLogger(KotlinLogging.logger("GC"))
-        CmdContext.removeEntry(ids)
+        val deleted = mutableSetOf<String>()
+        Operations.listEntry(CmdContext.storage).forEach {
+            if (it.name in names) {
+                Operations.deleteEntry(it, CmdContext.storage)
+                echo("Deleted: ${it.name}")
+                deleted.add(it.name)
+            }
+        }
+        (names - deleted).forEach {
+            echo("Not found: $it", err = true)
+        }
     }
 }

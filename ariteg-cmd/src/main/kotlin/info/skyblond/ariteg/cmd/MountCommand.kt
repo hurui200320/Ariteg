@@ -5,14 +5,16 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import info.skyblond.ariteg.cmd.fuse.AritegFS
+import info.skyblond.ariteg.cmd.fuse.asOtcInt
 import mu.KotlinLogging
 import java.nio.file.Paths
-import java.util.concurrent.ForkJoinPool
 
 class MountCommand : CliktCommand(
     name = "mount",
-    help = "mount as FUSE"
+    help = "mount as FUSE. Check jnr-fuse for more detailed info."
 ) {
+    private val logger = KotlinLogging.logger("Mount")
+
     private val mountPath: String by argument(name = "path", help = "Path to mount the FUSE")
 
     private val mountUid: String? by option("-u", "--uid", help = "Owner uid")
@@ -20,13 +22,14 @@ class MountCommand : CliktCommand(
     private val mountDirMask: String by option("-d", "--dir", help = "Dir mask (UGO)").default("0755")
     private val mountFileMask: String by option("-f", "--file", help = "Dir mask (UGO)").default("0644")
 
+    // TODO: GraalVM doesn't support JNR
     override fun run() {
-        CmdContext.setLogger(KotlinLogging.logger("Mount"))
         val memfs = AritegFS(
             uid = mountUid?.toLong(),
             gid = mountGid?.toLong(),
             dirMask = mountDirMask.asOtcInt(),
-            fileMask = mountFileMask.asOtcInt()
+            fileMask = mountFileMask.asOtcInt(),
+            logger = logger
         )
         try {
             echo("Mounting to `$mountPath` Press CTRL+C to exit")

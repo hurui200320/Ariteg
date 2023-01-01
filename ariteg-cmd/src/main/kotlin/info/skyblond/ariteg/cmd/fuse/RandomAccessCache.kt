@@ -2,18 +2,20 @@ package info.skyblond.ariteg.cmd.fuse
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
-import info.skyblond.ariteg.Blob
-import info.skyblond.ariteg.Link
-import info.skyblond.ariteg.ListObject
-import info.skyblond.ariteg.TreeObject
 import info.skyblond.ariteg.cmd.CmdContext
+import info.skyblond.ariteg.storage.obj.*
+import kotlinx.coroutines.runBlocking
+import mu.KotlinLogging
+import java.io.FileNotFoundException
 import java.math.BigInteger
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
 /**
  * This object holds the caches for random access needs.
  * */
 object RandomAccessCache {
+    private val logger = KotlinLogging.logger {  }
     // ------------------------------ BLOB cache ------------------------------
     /**
      * The blobs are immutable, but caching them cost a lot of RAM.
@@ -35,11 +37,11 @@ object RandomAccessCache {
         // here might be multiple thread reading one blob, introducing lock will make
         // things complicated. Thus, we (I) can tolerate that.
         return try {
-            val blob = CmdContext.storage.read(link).get() as Blob
+            val blob = runBlocking { CmdContext.storage.read(link) as Blob }
             blobContentCache.put(link.hash, blob.data)
             blob
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to read $link" }
+            logger.error(t) { "Failed to read $link" }
             null
         }
     }
@@ -55,17 +57,17 @@ object RandomAccessCache {
         .softValues()
         .build()
 
-    fun getCachedList(link: Link): ListObject? {
+    private fun getCachedList(link: Link): ListObject? {
         if (link.type != Link.Type.LIST) return null
         // return if found
         listCache.getIfPresent(link.hash)?.let { return it }
         // not found, read it
         return try {
-            val list = CmdContext.storage.read(link).get() as ListObject
+            val list = runBlocking { CmdContext.storage.read(link) as ListObject }
             listCache.put(link.hash, list)
             list
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to read $link" }
+            logger.error(t) { "Failed to read $link" }
             null
         }
     }
@@ -80,16 +82,49 @@ object RandomAccessCache {
         treeCache.getIfPresent(link.hash)?.let { return it }
         // not found, read it
         return try {
-            val tree = CmdContext.storage.read(link).get() as TreeObject
+            val tree = runBlocking { CmdContext.storage.read(link) as TreeObject }
             treeCache.put(link.hash, tree)
             tree
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to read $link" }
+            logger.error(t) { "Failed to read $link" }
+            null
+        }
+    }
+
+    // ------------------------------ Entry cache ------------------------------
+    /**
+     * Cache entry, so it will be faster when resolving path.
+     * The path can be updated, so each cache's TTL is 10s.
+     * */
+    private val entryCache: Cache<String, Entry> = Caffeine.newBuilder()
+        .expireAfterWrite(10, TimeUnit.SECONDS)
+        .softValues()
+        .build()
+
+    fun getCachedEntry(name: String): Entry? {
+        // return if found
+        entryCache.getIfPresent(name)?.let { return it }
+        // not found, read it
+        return try {
+            val entry = runBlocking { CmdContext.storage.getEntry(name) }
+            entryCache.put(name, entry)
+            entry
+        } catch (t: ExecutionException) {
+            if (t.cause !is FileNotFoundException)
+                logger.error(t) { "Failed to read entry $name" }
+            null
+        } catch (t: Throwable) {
+            logger.error(t) { "Failed to read entry $name" }
             null
         }
     }
 
     // ------------------------------ Blob index cache ------------------------------
+    data class FileIndexEntry(
+        val offset: Long,
+        val link: Link
+    )
+
     /**
      * This is the cache for random access index.
      * On disk, Files can be represented in a messy style:
@@ -97,14 +132,15 @@ object RandomAccessCache {
      * It can be a fancy tree, but not easy to make random access.
      * During reading, it would be great to have a flattened list:
      * List[BLOB, BLOB, BLOB, ...]
-     * That will make offset faster.
-     * TODO this is a simple linked index, might need anchor index like:
-     *      [0K -> BLOB#1, 16K -> BLOB#15, 32K -> BLOB#34, ...]?
+     * To make it even faster, the index will log each blob's offset:
+     * [0K -> BLOB#1, 16K -> BLOB#15, 32K -> BLOB#34, ...]
      *
      * This cache is essential to read operations, so keep it longer in the RAM.
+     *
+     * About long: The offset from FUSE is Long. We don't need BigInteger.
      * */
-    private val blobIndexCache: Cache<String, List<Link>> = Caffeine.newBuilder()
-        .expireAfterAccess(5, TimeUnit.MINUTES)
+    private val blobIndexCache: Cache<String, List<FileIndexEntry>> = Caffeine.newBuilder()
+        .expireAfterAccess(15, TimeUnit.MINUTES)
         .build()
 
     private fun flatten(link: Link): List<Link> {
@@ -117,16 +153,20 @@ object RandomAccessCache {
         }
     }
 
-    fun getIndex(link: Link): List<Link>? {
+    fun getIndex(link: Link): List<FileIndexEntry>? {
         // return if found
         blobIndexCache.getIfPresent(link.hash)?.let { return it }
         // not found
         return try {
-            val result = flatten(link)
+            val flattened = flatten(link)
+            var offset = 0L
+            val result = flattened.map { l ->
+                (FileIndexEntry(offset, l)).also { offset += l.size }
+            }
             blobIndexCache.put(link.hash, result)
             result
         } catch (t: Throwable) {
-            CmdContext.logger.error(t) { "Failed to build index for $link" }
+            logger.error(t) { "Failed to build index for $link" }
             null
         }
     }
@@ -157,7 +197,7 @@ object RandomAccessCache {
                 ?.sumOf { it } ?: BigInteger.ZERO
 
             Link.Type.TREE -> getCachedTree(link)?.content
-                ?.map { calculateFileSize(it) }
+                ?.map { calculateFileSize(it.value) }
                 ?.sumOf { it } ?: BigInteger.ZERO
         }
     }

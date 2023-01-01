@@ -3,16 +3,12 @@ plugins {
 }
 
 group = "info.skyblond.ariteg"
-version = VersionUtils.getVersion()
+version = rootProject.version as String
 description = "The core implementation of ariteg"
 
 dependencies {
-    // crypto operations
-    implementation(libs.bc.prov)
-    // multihash
-    implementation(libs.multihash.java)
-    // json & yaml operation
-    implementation(libs.jackson.kotlin)
+    implementation(project(":storage-core"))
+    testImplementation(project(":storage-file"))
     // commons-io
-    implementation(libs.commons.io)
+    testImplementation(libs.commons.io)
 }

@@ -1,117 +1,66 @@
 package info.skyblond.ariteg.cmd
 
-import info.skyblond.ariteg.Entry
-import info.skyblond.ariteg.Operations
+import info.skyblond.ariteg.storage.FileStorage
+import info.skyblond.ariteg.storage.MinioStorage
 import info.skyblond.ariteg.storage.Storage
-import mu.KLogger
+import io.minio.MinioClient
+import mu.KotlinLogging
 import java.io.File
-import java.util.concurrent.CompletableFuture
+import java.util.*
 
 object CmdContext {
-    @JvmStatic
-    lateinit var storage: Storage
-        private set
+    private val logger = KotlinLogging.logger { }
+
+    private const val ENV_CONNECT_STRING = "ARITEG_CONNECT_STR"
+    private const val ENV_ENCRYPTION_KEY = "ARITEG_ENCRYPTION_KEY"
+
+    private fun parseKeyBase64(keyBase64: String): ByteArray? =
+        if (keyBase64.isBlank()) null else Base64.getDecoder().decode(keyBase64)
 
     @JvmStatic
-    lateinit var logger: KLogger
-        private set
-
-    @JvmStatic
-    @Suppress("MemberVisibilityCanBePrivate")
-    val slicerProvider
-        get() = getSlicerProvider()
-
-    @JvmStatic
-    fun setStorage(storage: Storage) {
-        CmdContext.storage = storage
-    }
-
-    fun setLogger(logger: KLogger) {
-        CmdContext.logger = logger
-    }
-
-    @JvmStatic
-    fun download(id: String, rootFolder: File) {
-        logger.info { "Finding entry..." }
-        val entry = Operations.listEntry(storage)
-            .find { it.id == id } ?: error("Entry not found")
-        logger.info { "Start downloading..." }
-        Operations.restore(entry, storage, rootFolder)
-        logger.info { "Done" }
-    }
-
-    @JvmStatic
-    fun gc() {
-        logger.info { "Starting gc..." }
-        Operations.gc(storage)
-        logger.info { "Done" }
-    }
-
-    @JvmStatic
-    fun integrityCheck(deleting: Boolean) {
-        logger.info { "Starting integrity check..." }
-        Operations.integrityCheck(storage, deleting)
-        logger.info { "Done" }
-    }
-
-    @JvmStatic
-    fun listEntry(): List<Entry> {
-        return Operations.listEntry(storage)
-    }
-
-    @JvmStatic
-    fun removeEntry(ids: List<String>) {
-        logger.info { "Listing entries..." }
-        val entries = Operations.listEntry(storage)
-        logger.info { "Deleting..." }
-
-        ids.forEach { target ->
-            entries.find { it.id == target }?.let { entry ->
-                Operations.deleteEntry(entry, storage)
-                logger.info { "Entry $target deleted" }
-            } ?: logger.error { "Entry $target not found" }
-        }
-    }
-
-    @JvmStatic
-    fun upload(files: List<File>) {
-        files.map { file ->
-            logger.info { "Uploading ${file.canonicalPath}" }
-            val entry = Operations.digest(file, slicerProvider, storage)
-            logger.info { "Finished ${entry.name}" }
-            entry
-        }.forEach { entry ->
-            entry.printDetails()
-        }
-
-        logger.info { "Done" }
-    }
-
-    @JvmStatic
-    fun verifyEntry(ids: List<String>) {
-        logger.info { "Listing entries..." }
-        Operations.listEntry(storage).forEach { entry ->
-            if (ids.isNotEmpty() && entry.id !in ids) {
-                return@forEach
-            }
-            logger.info { "Verifying entry: ${entry.id} (${entry.name})" }
-            val blobs = Operations.resolve(entry, storage)
-            logger.info { "Verifying ${blobs.size / 1000.0}K blobs..." }
-            val semaphore = Operations.getLimitingSemaphore()
-            blobs.map {
-                CompletableFuture.runAsync {
-                    semaphore.acquire()
-                    storage.read(it)
-                }.exceptionally { semaphore.release(); throw it }
-                    .thenRun { semaphore.release() }
-            }.forEachIndexed { index, completableFuture ->
-                completableFuture.get()
-                if (index % 1000 == 0) {
-                    logger.info { "${index / 1000}K blobs are checked" }
+    val storage: Storage = kotlin.run {
+        val connectString: String = System.getenv(ENV_CONNECT_STRING)
+            ?: error(
+                "Env `$ENV_CONNECT_STRING` not set.\n" +
+                        "Format: \n" +
+                        "\tfile://path/to/data/folder\n" +
+                        "\tminio://access@secret:host[:port]/bucketName"
+            )
+        val keyBase64: String = System.getenv(ENV_ENCRYPTION_KEY)
+            ?: "".also {
+                logger.warn {
+                    "Env `$ENV_ENCRYPTION_KEY` not set, no encryption.\n" +
+                            "To enable encryption, supply base64 encoded key (32 bytes)."
                 }
             }
-        }
-        logger.info { "Done" }
-    }
 
+        when {
+            connectString.startsWith("file://") -> {
+                // something like "file:///mnt/something"
+                val path = connectString.removePrefix("file://")
+                val file = File(path)
+                FileStorage(file, parseKeyBase64(keyBase64))
+            }
+
+            connectString.startsWith("minio://") -> {
+                // something like "minio://access@secret:host:port/bucketName"
+                val str = connectString.removePrefix("minio://")
+                val (url, bucketName) = str.split("/")
+                    .also { require(it.size == 2) { "Failed to resolve url and bucket name from: $connectString" } }
+                // now url is "access@secret:host:port"
+                val (credential, host) = url.split(":").let {
+                    it[0] to it.drop(1).joinToString(":")
+                }
+                val (accessKey, secretKey) = credential.split("@")
+                    .also { require(it.size == 2) { "Failed to resolve access key from: $connectString" } }
+                val client = MinioClient.builder()
+                    .endpoint(host)
+                    .credentials(accessKey, secretKey)
+                    .build()
+                MinioStorage(client, bucketName, parseKeyBase64(keyBase64))
+            }
+
+            else -> error("Unknown schema in $connectString")
+        }
+    }
 }

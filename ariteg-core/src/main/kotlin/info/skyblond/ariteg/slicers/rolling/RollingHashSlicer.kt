@@ -1,25 +1,20 @@
 package info.skyblond.ariteg.slicers.rolling
 
-import info.skyblond.ariteg.Blob
 import info.skyblond.ariteg.slicers.Slicer
-import java.io.File
-import java.io.FileInputStream
-import java.io.RandomAccessFile
-import java.nio.ByteBuffer
+import info.skyblond.ariteg.storage.obj.Blob
+import java.io.InputStream
 
 abstract class RollingHashSlicer(
-    private val file: File,
-    protected val targetFingerprint: UInt,
-    protected val fingerprintMask: UInt,
+    private val targetFingerprint: UInt,
+    private val fingerprintMask: UInt,
     private val minChunkSize: Int,
     private val maxChunkSize: Int,
     private val windowSize: Int,
-    private val channelBufferSize: Int
+    private val bufferSize: Int
 ) : Slicer {
 
     init {
         require(windowSize < minChunkSize) { "Window size must smaller than minChunkSize" }
-        require(file.length() >= windowSize) { "File size must bigger or equal than window size" }
     }
 
     /**
@@ -34,109 +29,64 @@ abstract class RollingHashSlicer(
     protected abstract fun calcNextHash(currentHash: UInt, inByte: UInt, outByte: UInt): UInt
 
 
-    override fun iterator(): Iterator<Blob> = object : Iterator<Blob>, AutoCloseable {
-        // for calculating split point
-        private val randomAccessFile = RandomAccessFile(file, "r")
-        private val fileChannel = randomAccessFile.channel
-        private val channelBuffer = ByteBuffer.allocate(channelBufferSize)
-        private var channelBufferMax: Int = 0
-        private var channelBufferPos: Int = 0
-
-        private val windowBuffer = Array(windowSize) { readNextWindowByte()!! }
-        private var windowBufferPos = 0
-
-        private var hash: UInt = initWindowHash(windowBuffer)
-
-        // for making chunks
-        private val fileStream = FileInputStream(file)
-
-        private fun isFingerprintMatch(): Boolean {
-            return this.hash and fingerprintMask == targetFingerprint
-        }
-
-        private fun readNextWindowByte(): UInt? {
-            if (this.channelBufferPos >= this.channelBufferMax) {
-                // read new data
-                channelBuffer.clear()
-                this.channelBufferMax = this.fileChannel.read(this.channelBuffer)
-                this.channelBuffer.flip()
-                this.channelBufferPos = 0
+    override fun slice(input: InputStream): Sequence<Blob> = sequence {
+        // window buffer
+        val windowBuffer = Array(windowSize) { 0u }
+        var windowBufferPos = 0
+        // chunk buffer
+        val chunkBuffer = ByteArray(maxChunkSize)
+        var chunkPos = 0
+        // fill up the window
+        ByteArray(windowSize).also { buffer ->
+            val readCount = input.read(buffer)
+            if (readCount != windowSize) {
+                // file is too small, just return it as a chunk
+                if (readCount != -1) {
+                    yield(Blob(buffer.copyOfRange(0, readCount)))
+                } // we're done
+                return@sequence
             }
-            // after reload, the pos==max
-            // means this is really the end
-            if (channelBufferPos >= channelBufferMax) {
-                return null
+            for (i in windowBuffer.indices) {
+                windowBuffer[i] = buffer[i].toUInt() and 0xFFu
+                chunkBuffer[chunkPos++] = buffer[i]
             }
-            this.channelBufferPos++
-            return this.channelBuffer.get().toUInt() and 0xFFu
         }
+        // calculate hash
+        var hash: UInt = initWindowHash(windowBuffer)
 
-        private var closed = false
-        private var chunkSize = windowSize
-        private val chunkBuffer = ByteArray(maxChunkSize)
-
-        override fun hasNext(): Boolean {
-            // try to find new chunks
-            // Note: chunkSize will be windowSize at be beginning
-            // Then will be zero at each call.
-            // And no matter what, the chunkSize must bigger than minChunkSize
-            // if not, then it's invalid, and we can find new chunks.
-            if (chunkSize < minChunkSize && !closed) {
-                // find new chunk
-                while (true) {
-                    if (chunkSize >= minChunkSize) {
-                        // min chunk size reached, see if we can make a new chunk
-                        if (isFingerprintMatch()) {
-                            // fingerprint match, has next
-                            fileStream.readNBytes(chunkBuffer, 0, chunkSize)
-                            break
-                        }
-                    }
-                    // update window
-                    val inByte = readNextWindowByte()
-                    if (inByte == null) {
-                        // no bytes to read, current is the last chunk
-                        if (chunkSize > 0) {
-                            fileStream.readNBytes(chunkBuffer, 0, chunkSize)
-                        }
-                        closed = true
-                        close()
-                        break
-                    }
-                    val outByte = windowBuffer[windowBufferPos]
-                    windowBuffer[windowBufferPos++] = inByte
-                    windowBufferPos %= windowSize
-                    hash = calcNextHash(hash, inByte, outByte)
-                    chunkSize++
-
-                    if (chunkSize >= maxChunkSize) {
-                        // max chunk size reached, we have to make a new chunk
-                        fileStream.readNBytes(chunkBuffer, 0, chunkSize)
-                        break
-                    }
+        // input buffer
+        val buffer = ByteArray(bufferSize)
+        while (true) {
+            // load buffer
+            val readCount = input.read(buffer)
+            if (readCount == -1) break // EOF
+            for (i in 0 until readCount) {
+                // for each new byte
+                // check old data first
+                if (// we have enough bytes and there is a chunk
+                    (chunkPos >= minChunkSize && hash and fingerprintMask == targetFingerprint)
+                    // we have too many bytes, we must chunk
+                    || chunkPos >= maxChunkSize
+                ) {
+                    val chunk = chunkBuffer.copyOfRange(0, chunkPos)
+                    chunkPos = 0
+                    yield(Blob(chunk)) // generate new blob
                 }
-            }
-            // if chunkSize > 0, there has next chunk
-            return chunkSize > 0
-        }
-
-        override fun next(): Blob {
-            if (hasNext()) {
-                val chunk = ByteArray(chunkSize)
-                System.arraycopy(chunkBuffer, 0, chunk, 0, chunkSize)
-                // cleat last read count, so hasNext() can fill the buffer
-                chunkSize = 0
-                return Blob(chunk)
-            } else {
-                throw NoSuchElementException("No further elements")
+                // for new byte, update window
+                val inByte = buffer[i].toUInt() and 0xFFu
+                val outByte = windowBuffer[windowBufferPos]
+                windowBuffer[windowBufferPos++] = inByte
+                windowBufferPos %= windowSize
+                hash = calcNextHash(hash, inByte, outByte)
+                // save new byte to buffer
+                chunkBuffer[chunkPos++] = buffer[i]
             }
         }
-
-        override fun close() {
-            fileChannel.close()
-            randomAccessFile.close()
-            fileStream.close()
+        // now we have read and processed all data
+        // but there still might something left
+        if (chunkBuffer.isNotEmpty()) {
+            val chunk = chunkBuffer.copyOfRange(0, chunkPos)
+            yield(Blob(chunk)) // generate last blob
         }
-
     }
 }

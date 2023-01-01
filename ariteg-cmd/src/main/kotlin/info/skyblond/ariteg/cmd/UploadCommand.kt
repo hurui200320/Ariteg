@@ -4,6 +4,8 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.types.file
+import info.skyblond.ariteg.Operations
+import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import java.io.File
 
@@ -11,15 +13,24 @@ class UploadCommand : CliktCommand(
     name = "upload",
     help = "Upload a file or a folder to the storage"
 ) {
-    private val files: List<File> by argument(name = "Path", help = "Path to content to be uploaded")
-        .file(
-            mustExist = true,
-            canBeFile = true,
-            canBeDir = true
-        ).multiple()
+    private val logger = KotlinLogging.logger("Upload")
+
+    private val files: List<File> by argument(name = "path", help = "Path to content to be uploaded, can be multiple")
+        .file(mustExist = true, canBeFile = true, canBeDir = true)
+        .multiple(required = true)
 
     override fun run() {
-        CmdContext.setLogger(KotlinLogging.logger("Upload"))
-        CmdContext.upload(files)
+        runBlocking {
+            files.map { file ->
+                logger.info { "Uploading ${file.canonicalPath}" }
+                val entry = Operations.digest(file, getSlicer(), CmdContext.storage)
+                logger.info { "Finished ${entry.name}" }
+                entry
+            }.forEach { entry ->
+                echo("Uploaded: ${entry.name}")
+            }
+        }
+
+        logger.info { "Done" }
     }
 }
